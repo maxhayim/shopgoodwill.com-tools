@@ -28,8 +28,9 @@ Tampermonkey installs updates automatically, so only the latest release receives
 ## Secure Development Practices
 
 - Scripts run with `@grant none`: no special userscript permissions.
-- Scripts make no network requests and store no data.
+- Scripts only contact ShopGoodwill itself (`buyerapi.shopgoodwill.com`, the site's own API). Price Check builds links to other marketplaces but never fetches from them.
+- The only data stored is your shipping ZIP code and cached estimates, in your browser's storage for shopgoodwill.com.
 - Scripts never place bids, click buttons or submit forms.
-- Scripts only change the text of the elements they convert, and never insert HTML.
+- Scripts never insert HTML built from page or API data; text from ShopGoodwill is always set as plain text.
 - No third-party code or dependencies are bundled.
 - Updates are served only from this repository's `main` branch over HTTPS.
