@@ -1,0 +1,24 @@
+{
+  "name": "shopgoodwill.com-tools",
+  "version": "1.0.0",
+  "description": "Open-source browser tools and enhancements for ShopGoodwill.com, including timezone conversion, auction tracking, notifications, and future utilities.",
+  "private": true,
+  "license": "MIT",
+  "author": "maxhayim",
+  "homepage": "https://github.com/maxhayim/shopgoodwill.com-tools#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/maxhayim/shopgoodwill.com-tools.git"
+  },
+  "bugs": {
+    "url": "https://github.com/maxhayim/shopgoodwill.com-tools/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "check": "node dev/check-syntax.js",
+    "test": "node --test",
+    "validate": "npm run check && npm test"
+  }
+}
