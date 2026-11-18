@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         shopgoodwill.com tools - Eastern Time
 // @namespace    https://github.com/maxhayim/shopgoodwill.com-tools
-// @version      1.0.0
+// @version      1.0.1
 // @description  Converts ShopGoodwill auction ending times from Pacific to Eastern Time.
 // @author       maxhayim
 // @license      MIT
@@ -48,6 +48,13 @@
   var CONFIG = {
     // Elements whose text holds an auction ending time in Pacific Time.
     timeSelectors: ['li.text-danger'],
+
+    // Times shown next to a label, e.g. the item page's Item Info table:
+    //   <th>Ends On:</th><td>11/23/2026 07:56:00 PM PT</td>
+    // The value is the label's next element.
+    labeledTimes: [
+      { labelSelector: 'th', label: /^(Ends|Ended|Ending|Starts|Started) On:?$/i }
+    ],
 
     // How many ancestor levels to search for the auction's closing date when
     // the date is not in the time element itself. A level is only used if it
@@ -415,6 +422,13 @@
       }
     });
     if (matchesAny(root, config.timeSelectors) && processElement(root, config)) changed++;
+    (config.labeledTimes || []).forEach(function (def) {
+      var labels = root.querySelectorAll(def.labelSelector);
+      for (var i = 0; i < labels.length; i++) {
+        var value = labels[i].nextElementSibling;
+        if (value && def.label.test((labels[i].textContent || '').trim()) && processElement(value, config)) changed++;
+      }
+    });
     return changed;
   }
 

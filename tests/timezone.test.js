@@ -53,6 +53,11 @@ class Element {
     const mine = this.className.split(/\s+/);
     return classes.every((c) => mine.includes(c));
   }
+  get nextElementSibling() {
+    if (!this.parentElement) return null;
+    const sibs = this.parentElement.childNodes.filter((c) => c.nodeType === 1);
+    return sibs[sibs.indexOf(this) + 1] || null;
+  }
   querySelectorAll(sel) {
     const out = [];
     const walk = (el) => el.childNodes.forEach((c) => {
@@ -325,4 +330,26 @@ test('dynamically inserted elements are converted by the observer', () => {
 
   handle.stop();
   assert.equal(win.observers.length, 0);
+});
+
+test('item page "Ends On" row is converted using its own date', () => {
+  const td = new Element('td', '', [' 11/23/2026 07:56:00 PM PT ']);
+  const other = new Element('td', '', [' 284347676 ']);
+  const body = new Element('body', '', [
+    new Element('table', '', [
+      new Element('tr', '', [new Element('th', '', [' Item ID: ']), other]),
+      new Element('tr', '', [new Element('th', '', [' Ends On: ']), td])
+    ])
+  ]);
+  assert.equal(sgw.scan(body), 1);
+  assert.equal(td.textContent, ' 11/23/2026 10:56:00 PM EST ');
+  assert.equal(other.textContent, ' 284347676 ');
+  assert.equal(sgw.scan(body), 0);
+});
+
+test('"Ends On" late at night moves the date too', () => {
+  const td = new Element('td', '', ['8/31/2026 10:30:00 PM PT']);
+  const body = new Element('body', '', [new Element('tr', '', [new Element('th', '', ['Ends On:']), td])]);
+  sgw.scan(body);
+  assert.equal(td.textContent, '9/1/2026 1:30:00 AM EDT');
 });

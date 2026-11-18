@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         shopgoodwill.com tools - Live Auction
 // @namespace    https://github.com/maxhayim/shopgoodwill.com-tools
-// @version      1.1.0
+// @version      1.2.0
 // @description  Keeps the price, bid count and a to-the-second countdown up to date on ShopGoodwill item pages without reloading.
 // @author       maxhayim
 // @license      MIT
@@ -202,7 +202,7 @@
   // Page.
   // ---------------------------------------------------------------------------
   var STYLE = [
-    '.P-chip{display:inline-flex;align-items:center;gap:5px;margin-left:8px;padding:1px 8px;border-radius:999px;background:#e8f5ec;color:#1b6b34;font-size:.75rem;font-weight:600;vertical-align:middle;cursor:pointer;user-select:none}',
+    '.P-chip{white-space:nowrap;display:inline-flex;align-items:center;gap:5px;margin-left:8px;padding:1px 8px;border-radius:999px;background:#e8f5ec;color:#1b6b34;font-size:.75rem;font-weight:600;vertical-align:middle;cursor:pointer;user-select:none}',
     '.P-chip i{width:7px;height:7px;border-radius:50%;background:#22a050;animation:P-pulse 1.6s ease-in-out infinite}',
     '.P-chip.P-paused{background:#eee;color:#666}.P-chip.P-paused i{background:#999;animation:none}',
     '.P-chip.P-ended{background:#f4e6e6;color:#8b1c1c}.P-chip.P-ended i{background:#8b1c1c;animation:none}',
@@ -314,7 +314,10 @@
       chip.lastChild.textContent = 'Live';
       chip.addEventListener('click', togglePause);
       chip.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); togglePause(); } });
-      var anchor = targets.price || targets.timeLeft.parentElement;
+      // End of the "Time left | Bids" bar; next to the price if that bar is missing.
+      var anchor = targets.timeLeft && targets.timeLeft.parentElement && targets.timeLeft.parentElement.parentElement
+        ? targets.timeLeft.parentElement.parentElement
+        : targets.price;
       anchor.appendChild(chip);
       state.chip = chip;
       poll();

@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented here. This project uses [Semantic Versioning](https://semver.org/).
 
+## v1.2.0 — Bid Alerts
+
+Release date: November 18, 2026
+
+- **Bid Alerts** (`shopgoodwill-bid-alerts.user.js` 1.2.0), a new tool. It alerts you when you're outbid, when a bid reaches your max exactly, when someone bids on an item you follow, before an auction ends (15/5/1 minutes, configurable) and when it ends. Bids you place in this browser are followed automatically from the site's "bid accepted" reply (read only). **Alert me** on item pages follows anything else, with an optional max bid. Alerts are pop-ups on every open ShopGoodwill tab, with optional sound and desktop notifications, and one tab does the checking. A Bid alerts button lists everything followed, with its status and the settings.
+- **Eastern Time 1.0.1:** also converts the item page's **Ends On** line, using its own date for EST/EDT (`11/23/2026 07:56:00 PM PT` → `11/23/2026 10:56:00 PM EST`).
+- **Live Auction 1.2.0:** the Live chip moved to the Time left / Bids bar so it no longer wraps under the price, and stays on one line.
+- Screenshots of every tool in the README (taken with a demo ZIP code).
+- 16 new automated tests (65 in total).
+- Checked on live ShopGoodwill pages in Chrome:
+  - Ends On conversion.
+  - Outbid alert straight after following with a max below the price.
+  - "Ends in under 5 minutes", "under 1 minute" and "Auction ended" alerts on a real auction.
+  - The same alerts arriving once in each of two tabs, with one tab checking.
+  - The overview panel and settings.
+- Not yet checked: automatic follow after a real bid (no bids were placed while testing) and desktop notifications (permission not granted while testing).
+
 ## v1.1.0 — Shipping, Live Auction & Price Check
 
 Release date: November 18, 2026
