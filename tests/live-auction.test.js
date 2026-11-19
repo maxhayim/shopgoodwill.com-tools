@@ -52,14 +52,18 @@ class E {
     kids.forEach((k) => this.add(typeof k === 'string' ? new T(k) : k));
   }
   add(k) { k.parentElement = this; this.childNodes.push(k); return this; }
+  setAttribute(n, v) { (this.attrs = this.attrs || {})[n] = String(v); }
   get children() { return this.childNodes.filter((c) => c.nodeType === 1); }
   get firstElementChild() { return this.children[0] || null; }
   get nextElementSibling() { const s = this.parentElement.children; return s[s.indexOf(this) + 1] || null; }
   get textContent() { return this.childNodes.map((c) => c.textContent).join(''); }
   querySelectorAll(sel) {
-    const tags = sel.split(',').map((t) => t.trim().toUpperCase());
+    const parts = sel.split(',').map((t) => t.trim());
+    const hit = (c) => parts.some((p) => p.startsWith('[')
+      ? !!(c.attrs && Object.prototype.hasOwnProperty.call(c.attrs, p.slice(1, -1)))
+      : p.toUpperCase() === c.tagName);
     const out = [];
-    const walk = (e) => e.children.forEach((c) => { if (tags.includes(c.tagName)) out.push(c); walk(c); });
+    const walk = (e) => e.children.forEach((c) => { if (hit(c)) out.push(c); walk(c); });
     walk(this);
     return out;
   }
@@ -93,6 +97,18 @@ test('finds the values by their labels', () => {
   assert.deepEqual(t.bids, [p.bidsA, p.bidsPrint]);
   assert.equal(t.price, p.price);
   assert.equal(t.minimumBid, p.minBid);
+});
+
+test('the Live chip sits in the Current Price label without hiding it', () => {
+  const p = panel();
+  const t = L.findTargets(p.root, L.CONFIG);
+  assert.equal(t.priceLabel.textContent, 'Current Price:');
+  const chip = new E('span', [new E('i'), new E('span', ['Live'])]);
+  chip.setAttribute('data-sgwt-chip', '');
+  t.priceLabel.add(chip);
+  const again = L.findTargets(p.root, L.CONFIG);
+  assert.equal(again.priceLabel, t.priceLabel);
+  assert.equal(again.price, p.price);
 });
 
 test('setText only changes the text, keeping spacing and other children', () => {

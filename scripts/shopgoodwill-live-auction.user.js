@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         shopgoodwill.com tools - Live Auction
 // @namespace    https://github.com/maxhayim/shopgoodwill.com-tools
-// @version      1.2.0
+// @version      1.3.0
 // @description  Keeps the price, bid count and a to-the-second countdown up to date on ShopGoodwill item pages without reloading.
 // @author       maxhayim
 // @license      MIT
@@ -134,19 +134,27 @@
   // ---------------------------------------------------------------------------
   // DOM helpers.
   // ---------------------------------------------------------------------------
-  function textOf(el) { return (el && el.textContent || '').replace(/\s+/g, ' ').trim(); }
+
+  // Label text without our own chip, so "Current Price: ● Live" still
+  // matches the Current Price label.
+  function labelText(el) {
+    var text = el && el.textContent || '';
+    var chips = el && el.querySelectorAll ? el.querySelectorAll('[data-sgwt-chip]') : [];
+    for (var i = 0; i < chips.length; i++) text = text.replace(chips[i].textContent || '', '');
+    return text.replace(/\s+/g, ' ').trim();
+  }
 
   // Finds the element whose own text matches `re` inside root.
   function findLabel(root, re) {
     var all = root.querySelectorAll('strong,h3,p,span,div');
     for (var i = 0; i < all.length; i++) {
       var el = all[i];
-      var text = textOf(el);
+      var text = labelText(el);
       if (!re.test(text)) continue;
       // Skip wrappers: a child holding the same text is the real label.
       var wrapper = false;
       for (var c = 0; c < el.children.length; c++) {
-        if (textOf(el.children[c]) === text) { wrapper = true; break; }
+        if (labelText(el.children[c]) === text) { wrapper = true; break; }
       }
       if (!wrapper) return el;
     }
@@ -192,6 +200,7 @@
     t.bids = [];
     for (var n = bidsLabel && bidsLabel.nextElementSibling; n; n = n.nextElementSibling) t.bids.push(n);
     var priceLabel = findLabel(panel, L.price);
+    t.priceLabel = priceLabel;
     t.price = priceLabel && valueInRow(priceLabel);
     var minLabel = findLabel(panel, L.minimumBid);
     t.minimumBid = minLabel && valueInRow(minLabel);
@@ -284,11 +293,14 @@
       if (chip) {
         var ended = left === 0;
         chip.className = P + '-chip' + (ended ? ' ' + P + '-ended' : state.paused ? ' ' + P + '-paused' : '');
+        // Kept to one short word so it fits on the Time left line; the age of
+        // the last check is in the tooltip.
         chip.lastChild.textContent = ended ? 'Ended' : state.paused ? 'Paused' :
-          'Live · ' + (state.error ? 'retrying' : 'updated ' + ago(Date.now() - state.fetchedAt));
+          state.error ? 'Retrying' : 'Live';
         chip.title = ended ? 'This auction has ended.' : state.paused
           ? 'Live updates are paused. Click to resume.'
-          : 'Price, bids and time left update automatically. Click to pause.';
+          : (state.error ? 'Last check failed, retrying. ' : 'Updated ' + ago(Date.now() - state.fetchedAt) + '. ') +
+            'Price, bids and time left update automatically. Click to pause.';
       }
       if (config.showInTabTitle && state.baseTitle) {
         doc.title = left === 0 ? state.baseTitle : tabTitle(state.baseTitle, left, state.detail.currentPrice);
@@ -308,16 +320,18 @@
       var chip = doc.createElement('span');
       chip.className = P + '-chip';
       chip.setAttribute('role', 'button');
+      chip.setAttribute('data-sgwt-chip', '');
       chip.setAttribute('tabindex', '0');
       chip.appendChild(doc.createElement('i'));
       chip.appendChild(doc.createElement('span'));
       chip.lastChild.textContent = 'Live';
       chip.addEventListener('click', togglePause);
       chip.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); togglePause(); } });
-      // End of the "Time left | Bids" bar; next to the price if that bar is missing.
-      var anchor = targets.timeLeft && targets.timeLeft.parentElement && targets.timeLeft.parentElement.parentElement
-        ? targets.timeLeft.parentElement.parentElement
-        : targets.price;
+      // Beside the "Current Price:" label, which has room to spare (the Time
+      // left bar is full once the Eastern end time is shown there). Falls back
+      // to the end of the Time left bar, then the price itself.
+      var bar = targets.timeLeft && targets.timeLeft.parentElement && targets.timeLeft.parentElement.parentElement;
+      var anchor = targets.priceLabel || bar || targets.price;
       anchor.appendChild(chip);
       state.chip = chip;
       poll();

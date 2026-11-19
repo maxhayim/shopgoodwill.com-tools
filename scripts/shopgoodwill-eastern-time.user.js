@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         shopgoodwill.com tools - Eastern Time
 // @namespace    https://github.com/maxhayim/shopgoodwill.com-tools
-// @version      1.0.1
+// @version      1.1.0
 // @description  Converts ShopGoodwill auction ending times from Pacific to Eastern Time.
 // @author       maxhayim
 // @license      MIT
@@ -55,6 +55,17 @@
     labeledTimes: [
       { labelSelector: 'th', label: /^(Ends|Ended|Ending|Starts|Started) On:?$/i }
     ],
+
+    // The item page's countdown ("Time left: 5h 12m") gets the Eastern end
+    // time beside it, taken from the Ends On line above.
+    endsBeside: {
+      container: 'app-bidding-control',
+      labelSelector: 'strong',
+      label: /^Time left:?$/i,
+      endsLabelSelector: 'th',
+      endsLabel: /^Ends On:?$/i,
+      className: 'sgwt-et-ends'
+    },
 
     // How many ancestor levels to search for the auction's closing date when
     // the date is not in the time element itself. A level is only used if it
@@ -317,6 +328,27 @@
     };
   }
 
+  var WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  /**
+   * Short Eastern end time for the countdown, from an Ends On value in either
+   * Pacific ("11/19/2026 06:02:00 PM PT") or already-converted Eastern form.
+   * Returns e.g. "Thu 11/19, 9:02 PM EST", or null if it can't be read.
+   */
+  function shortEasternEnd(text) {
+    if (!text) return null;
+    var conv = convertText(text);
+    var eastern = conv ? conv.text : text;
+    var d = /\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/.exec(eastern);
+    var t = /(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)\s*(EDT|EST|ET)\b/i.exec(eastern);
+    if (!d || !t) return null;
+    var month = +d[1], day = +d[2], year = +d[3];
+    if (!isValidDate(year, month, day)) return null;
+    var weekday = WEEKDAYS[new Date(Date.UTC(year, month - 1, day)).getUTCDay()];
+    return weekday + ' ' + month + '/' + day + ', ' + (+t[1]) + ':' + t[2] + ' ' +
+      t[3].toUpperCase() + ' ' + t[4].toUpperCase();
+  }
+
   function tooltipFor(conv) {
     var tip = 'Original: ' + conv.original + ' (Pacific Time)';
     if (!conv.result.certain) {
@@ -410,6 +442,48 @@
     return true;
   }
 
+  function findLabel(root, selector, re) {
+    var list = root.querySelectorAll(selector);
+    for (var i = 0; i < list.length; i++) {
+      if (re.test((list[i].textContent || '').trim())) return list[i];
+    }
+    return null;
+  }
+
+  // Puts "· ends Thu 11/19, 9:02 PM EST" right after the countdown value.
+  // Returns true if anything changed.
+  function addEndsBeside(root, config) {
+    var def = config.endsBeside;
+    if (!def || typeof root.querySelectorAll !== 'function') return false;
+    var doc = root.ownerDocument || root;
+    var containers = root.querySelectorAll(def.container);
+    if (!containers.length) return false;
+    var endsLabel = findLabel(root, def.endsLabelSelector, def.endsLabel);
+    var ends = endsLabel && endsLabel.nextElementSibling;
+    var short = ends ? shortEasternEnd(spacedText(ends).replace(/\s+/g, ' ').trim()) : null;
+    if (!short) return false;
+    var text = ' \u00b7 ends ' + short;
+    var changed = false;
+    for (var i = 0; i < containers.length; i++) {
+      var label = findLabel(containers[i], def.labelSelector, def.label);
+      var value = label && label.nextElementSibling;
+      if (!value) continue;
+      var next = value.nextElementSibling;
+      var el = next && next.className === def.className ? next : null;
+      if (!el) {
+        el = doc.createElement('span');
+        el.className = def.className;
+        el.setAttribute('style', 'color:#555;font-weight:400;white-space:nowrap;margin-right:.25em');
+        value.parentElement.insertBefore(el, value.nextSibling);
+        changed = true;
+      }
+      if (el.textContent !== text) { el.textContent = text; changed = true; }
+      var tip = 'Auction ends ' + short + ' (Eastern Time)';
+      if (el.getAttribute('title') !== tip) el.setAttribute('title', tip);
+    }
+    return changed;
+  }
+
   // Converts every matching element under root. Returns how many changed.
   function scan(root, config) {
     config = config || CONFIG;
@@ -429,6 +503,7 @@
         if (value && def.label.test((labels[i].textContent || '').trim()) && processElement(value, config)) changed++;
       }
     });
+    if (addEndsBeside(root, config)) changed++;
     return changed;
   }
 
@@ -491,6 +566,8 @@
     formatTime: formatTime,
     convertPacificToEastern: convertPacificToEastern,
     convertText: convertText,
+    shortEasternEnd: shortEasternEnd,
+    addEndsBeside: addEndsBeside,
     findClosingDate: findClosingDate,
     processElement: processElement,
     scan: scan,

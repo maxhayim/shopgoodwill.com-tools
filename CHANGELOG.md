@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented here. This project uses [Semantic Versioning](https://semver.org/).
 
+## v1.3.0 — End time beside the countdown
+
+Release date: November 19, 2026
+
+- **Eastern Time 1.1.0:** item pages show the end time in Eastern Time right beside the countdown, e.g. **Time left: 5h 18m · ends Thu 11/19, 9:02 PM EST**. It is read from the item's Ends On line, so EST/EDT follows the auction's own date.
+- **Live Auction 1.3.0:** the Live chip moved beside **Current Price** and shows just **Live** (the time of the last check is in its tooltip), so the Time left line stays on one line.
+- 3 new automated tests (69 in total).
+- Checked on a live ShopGoodwill item page in Chrome, with the countdown ticking next to the Eastern end time.
+
 ## v1.2.0 — Bid Alerts
 
 Release date: November 18, 2026

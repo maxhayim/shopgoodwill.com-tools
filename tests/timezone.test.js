@@ -44,6 +44,18 @@ class Element {
     return child;
   }
   get textContent() { return this.childNodes.map((c) => c.textContent).join(''); }
+  set textContent(v) { this.childNodes = []; this.appendChild(new TextNode(v)); }
+  get nextSibling() {
+    if (!this.parentElement) return null;
+    const sibs = this.parentElement.childNodes;
+    return sibs[sibs.indexOf(this) + 1] || null;
+  }
+  insertBefore(child, ref) {
+    const i = ref ? this.childNodes.indexOf(ref) : -1;
+    this.appendChild(child);
+    if (i >= 0) { this.childNodes.pop(); this.childNodes.splice(i, 0, child); }
+    return child;
+  }
   getAttribute(n) { return Object.prototype.hasOwnProperty.call(this.attributes, n) ? this.attributes[n] : null; }
   setAttribute(n, v) { this.attributes[n] = String(v); }
   hasAttribute(n) { return Object.prototype.hasOwnProperty.call(this.attributes, n); }
@@ -352,4 +364,47 @@ test('"Ends On" late at night moves the date too', () => {
   const body = new Element('body', '', [new Element('tr', '', [new Element('th', '', ['Ends On:']), td])]);
   sgw.scan(body);
   assert.equal(td.textContent, '9/1/2026 1:30:00 AM EDT');
+});
+
+// ---------------------------------------------------------------------------
+// Eastern end time beside the item page countdown.
+// ---------------------------------------------------------------------------
+test('shortEasternEnd reads Pacific or already-converted Ends On values', () => {
+  assert.equal(sgw.shortEasternEnd('11/19/2026 06:02:00 PM PT'), 'Thu 11/19, 9:02 PM EST');
+  assert.equal(sgw.shortEasternEnd('11/19/2026 09:02:00 PM EST'), 'Thu 11/19, 9:02 PM EST');
+  assert.equal(sgw.shortEasternEnd('7/4/2026 10:30:00 PM PT'), 'Sun 7/5, 1:30 AM EDT');
+  assert.equal(sgw.shortEasternEnd('soon'), null);
+});
+
+function itemPage(endsText, timeLeft) {
+  const doc = { createElement: (tag) => new Element(tag), _notify() {} };
+  const value = new Element('span', '', [timeLeft]);
+  const ends = new Element('td', '', [endsText]);
+  const bar = new Element('span', 'ng-star-inserted', [
+    new Element('strong', '', ['Time left:']), value, new Element('p', '', ['(update)'])
+  ]);
+  const body = new Element('body', '', [
+    new Element('app-bidding-control', '', [new Element('div', '', [bar])]),
+    new Element('table', '', [new Element('tr', '', [new Element('th', '', ['Ends On:']), ends])])
+  ]);
+  body.ownerDocument = doc;
+  return { body, bar, value, ends };
+}
+
+test('adds the Eastern end time right after the countdown, once', () => {
+  const p = itemPage('11/19/2026 06:02:00 PM PT', '5h 18m');
+  sgw.scan(p.body);
+  const added = p.value.nextElementSibling;
+  assert.equal(added.className, 'sgwt-et-ends');
+  assert.equal(added.textContent, ' \u00b7 ends Thu 11/19, 9:02 PM EST');
+  assert.equal(p.bar.textContent, 'Time left:5h 18m \u00b7 ends Thu 11/19, 9:02 PM EST(update)');
+  assert.equal(p.ends.textContent, '11/19/2026 9:02:00 PM EST');
+  assert.equal(sgw.scan(p.body), 0);
+  assert.equal(p.bar.querySelectorAll('span.sgwt-et-ends').length, 1);
+});
+
+test('no Ends On line: the countdown is left alone', () => {
+  const p = itemPage('', '5h 18m');
+  sgw.scan(p.body);
+  assert.equal(p.value.nextElementSibling.tagName, 'P');
 });

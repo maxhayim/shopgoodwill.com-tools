@@ -46,7 +46,7 @@ The tools don't depend on each other and work together on the same page.
 <table>
   <tr>
     <td width="50%"><img src="assets/screenshots/shipping-item.png" alt="Shipping breakdown box on an item page"><br><em>Shipping & Handling on an item page</em></td>
-    <td width="50%"><img src="assets/screenshots/live-auction.png" alt="Countdown in red with a Live, updated 5s ago chip"><br><em>Live Auction in the final minutes</em></td>
+    <td width="50%"><img src="assets/screenshots/live-auction.png" alt="Time left 5:08:14, ends Thu 11/19, 9:02 PM EST, and a Live chip beside Current Price"><br><em>Live Auction countdown with the Eastern end time beside it</em></td>
   </tr>
   <tr>
     <td><img src="assets/screenshots/bid-alerts-panel.png" alt="Bid alerts panel listing an outbid item, one within the max and one ended, plus settings"><br><em>Bid Alerts overview and settings</em></td>
@@ -69,6 +69,7 @@ The tools don't depend on each other and work together on the same page.
 - Uses the auction's closing date when it is on the page, never today's date.
 - Handles times that cross midnight, for example `10:30:00 PM PST` → `1:30:00 AM EST (next day)`.
 - Keeps the original Pacific time in a tooltip: hover over a converted time to see it.
+- On item pages, shows the end time in Eastern Time right beside the countdown: **Time left: 5h 18m · ends Thu 11/19, 9:02 PM EST**.
 - Also converts the item page's **Ends On** line (`11/23/2026 07:56:00 PM PT` → `11/23/2026 10:56:00 PM EST`), using its date for EST/EDT.
 - Works on pages Angular loads or redraws after the page opens (search results, paging, item pages).
 - Converts each time once, and converts again only if the site puts a new Pacific time in its place.
@@ -89,7 +90,7 @@ The tools don't depend on each other and work together on the same page.
 
 - **Time left** becomes a countdown that ticks every second (`1:45:41`), turning red in the last five minutes.
 - The current price, bid count and minimum bid refresh on their own, and briefly highlight when they change.
-- A **Live · updated 4s ago** chip next to the price shows when the page last checked. Click it to pause or resume.
+- A **Live** chip beside **Current Price** shows the updates are on; hover it to see when the page last checked. Click it to pause or resume.
 - The browser tab title shows the countdown and price (`⏱ 1:45:41 · $19.99 | …`), so you can follow an auction from another tab.
 - Checks more often as the end gets closer (every minute when days are left, every 4 seconds in the final 2 minutes), slows down while the tab is in the background, and stops when the auction ends.
 - The countdown uses ShopGoodwill's server clock, so it's right even if your computer's clock is off.
