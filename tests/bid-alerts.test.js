@@ -144,3 +144,63 @@ test('checks faster near the end', () => {
   assert.equal(A.pollEvery(5 * 86400000), 300000);
   assert.equal(A.pollEvery(null), 300000);
 });
+
+test('reads ShopGoodwill favorite hearts', () => {
+  const heart = (label, id) => ({ getAttribute: (k) => ({ 'aria-label': label, 'aria-describedby': id }[k] || null) });
+  assert.deepEqual(A.heartInfo(heart('Add to your Favorites list', '283927842')), { itemId: '283927842', adding: true });
+  assert.deepEqual(A.heartInfo(heart('Remove from your Favorites list', '283988695')), { itemId: '283988695', adding: false });
+  assert.equal(A.heartInfo(heart('Add to your Favorites list', 'tooltip-3')), null);
+  assert.equal(A.heartInfo(null), null);
+});
+
+test('search words: what to search and what to skip', () => {
+  assert.deepEqual(A.parseWords('  casio  g-shock -kids -LOT '), { query: 'casio g-shock', exclude: ['kids', 'lot'] });
+  assert.deepEqual(A.parseWords('-'), { query: '-', exclude: [] });
+  assert.deepEqual(A.parseWords(''), { query: '', exclude: [] });
+  const body = A.searchBody({ words: 'pyrex -lid', maxPrice: 25 }, 40);
+  assert.equal(body.searchText, 'pyrex');
+  assert.equal(body.highPrice, '25');
+  assert.equal(body.sortColumn, '1');
+  assert.equal(body.sortDescending, 'true');
+  assert.equal(A.searchBody({ words: 'pyrex' }).highPrice, '999999');
+  const url = A.searchPageUrl({ words: 'casio watch -kids', maxPrice: null });
+  assert.match(url, /^\/categories\/listing\?st=casio%20watch&/);
+  assert.match(url, /&hp=999999&/);
+  assert.match(url, /&col=1&/);
+  assert.match(url, /&desc=true&/);
+  assert.match(A.searchPageUrl({ words: 'pyrex', maxPrice: 40 }), /&hp=40&/);
+});
+
+test('new listings: first check is quiet, then only new items alert', () => {
+  const item = (id, start, title) => ({ itemId: id, title: title || 'Casio watch ' + id, startTime: start, currentPrice: 9.99 });
+  let out = A.newListings({ words: 'casio -kids' }, [item(3, '2026-11-18T21:16:00'), item(2, '2026-11-18T20:00:00')]);
+  assert.deepEqual(out.fresh, []);
+  assert.deepEqual(out.search.seen, ['3', '2']);
+  assert.equal(out.search.mark, '2026-11-18T21:16:00');
+
+  out = A.newListings(out.search, [
+    item(5, '2026-11-19T08:00:00'),
+    item(4, '2026-11-19T07:00:00', 'Casio Kids watch'), // skipped word
+    item(3, '2026-11-18T21:16:00'),
+    item(1, '2026-11-10T10:00:00')                      // old item that moved up
+  ]);
+  assert.deepEqual(out.fresh.map((i) => i.itemId), [5]);
+  assert.equal(out.search.mark, '2026-11-19T08:00:00');
+  assert.deepEqual(out.search.seen, ['3', '2', '5', '4', '1']);
+
+  // Nothing new: no alerts.
+  out = A.newListings(out.search, [item(5, '2026-11-19T08:00:00')]);
+  assert.deepEqual(out.fresh, []);
+
+  // A search with no results yet still alerts on its first match later.
+  const empty = A.newListings({ words: 'zzz' }, []).search;
+  assert.deepEqual(empty.seen, []);
+  assert.deepEqual(A.newListings(empty, [item(9, '2026-11-19T09:00:00')]).fresh.map((i) => i.itemId), [9]);
+});
+
+test('new listings remembers a limited number of items', () => {
+  const many = Array.from({ length: 500 }, (_, i) => ({ itemId: i + 1, title: 't', startTime: '2026-11-19T09:00:00' }));
+  const out = A.newListings({ words: 'x', seen: [] }, many, Object.assign({}, A.CONFIG, { maxSeenPerSearch: 400 }));
+  assert.equal(out.search.seen.length, 400);
+  assert.equal(out.search.seen[399], '500');
+});

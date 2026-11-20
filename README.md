@@ -17,7 +17,7 @@
 
 # shopgoodwill.com tools
 
-**shopgoodwill.com tools** is a set of small, independent browser userscripts that make ShopGoodwill.com easier to bid on: ending times in your time zone, what an item will really cost delivered, an auction page that keeps itself up to date, alerts when you're outbid, and one-click price checks before you bid.
+**shopgoodwill.com tools** is a set of small, independent browser userscripts that make ShopGoodwill.com easier to bid on: ending times in your time zone, what an item will really cost delivered, whether it's worth that price, an auction page that keeps itself up to date, alerts when you're outbid or when new listings match your words, and one-click price checks before you bid.
 
 Each tool is a single file in [`scripts/`](scripts/). Install only the ones you want. They work on desktop and on phones, including iPhone Safari (see [Installation](#installation)).
 
@@ -27,7 +27,8 @@ Each tool is a single file in [`scripts/`](scripts/). Install only the ones you 
 | **Shipping & Handling** | Estimated shipping & handling and the total cost for your ZIP code, on search results and item pages | [Install](https://raw.githubusercontent.com/maxhayim/shopgoodwill.com-tools/main/scripts/shopgoodwill-shipping.user.js) |
 | **Live Auction** | Keeps the price, bids and a to-the-second countdown up to date on item pages, and in the tab title | [Install](https://raw.githubusercontent.com/maxhayim/shopgoodwill.com-tools/main/scripts/shopgoodwill-live-auction.user.js) |
 | **Price Check** | One click to sold prices, current listings and search-by-photo on other marketplaces | [Install](https://raw.githubusercontent.com/maxhayim/shopgoodwill.com-tools/main/scripts/shopgoodwill-price-check.user.js) |
-| **Bid Alerts** | Pop-up, sound and desktop alerts when you're outbid, when someone bids on an item you follow, and before auctions end | [Install](https://raw.githubusercontent.com/maxhayim/shopgoodwill.com-tools/main/scripts/shopgoodwill-bid-alerts.user.js) |
+| **Deal Check** | Adds up the next bid, shipping and tax, says whether the item is worth it to keep or to resell, and shows the most to bid | [Install](https://raw.githubusercontent.com/maxhayim/shopgoodwill.com-tools/main/scripts/shopgoodwill-deal-check.user.js) |
+| **Bid Alerts** | Pop-up, sound and desktop alerts when you're outbid, when someone bids on an item you follow, before auctions end, and when new listings match your words. Favoriting an item turns its alerts on | [Install](https://raw.githubusercontent.com/maxhayim/shopgoodwill.com-tools/main/scripts/shopgoodwill-bid-alerts.user.js) |
 
 The tools don't depend on each other and work together on the same page.
 
@@ -109,6 +110,19 @@ The tools don't depend on each other and work together on the same page.
 - **Search by photo:** pick any of the item's photos, then search with Google Lens or Bing Visual Search.
 - Links open in a new tab. Nothing is fetched from those sites, and nothing about you is sent to them beyond the search itself.
 
+### Deal Check
+
+- A **Deal check** box under the bidding panel on every item page answers "is this worth it?".
+- **To keep:** enter what the item is worth to you. **To resell:** enter what it sells for (use **Look up sold prices**), plus what you'd pay to ship it to your buyer.
+- Adds up what you'd really pay: the next bid (or Buy It Now price) + shipping & handling to your ZIP code + your sales tax: **Next bid $122.00 + S&H $13.47 = $135.47**.
+- Gives a verdict:
+  - To keep: **Great deal** (you pay 70% of its worth or less), **Good deal** (up to 90%), **Fair price** (up to 100%), **Not worth it**.
+  - To resell: **Great flip**, **Worth flipping** (at least $10 profit and a 30% return, both adjustable), **Thin margin**, **Would lose money**. Selling fees are taken off first (13.6% + $0.40 a sale by default; change them in **Settings**).
+- Shows the most you can bid and still have a good deal: **Bid up to $166.53 to keep it a good deal**. Enter **Your bid** to see the verdict for a bid you have in mind.
+- Keeps the price current while the page is open, and remembers what you entered for each item for 60 days.
+- Shares the ZIP code with Shipping & Handling, so you enter it once.
+- **Look up sold prices** opens the Price Check panel if that tool is installed, otherwise eBay's sold listings for the item's title in a new tab.
+
 ### Bid Alerts
 
 - **Outbid:** alerts as soon as the price passes your max bid. If a bid reaches your max exactly, you get a separate "may be outbid" warning, because the earlier bidder wins a tie.
@@ -117,6 +131,8 @@ The tools don't depend on each other and work together on the same page.
 - **Ended:** the final price, and whether it was within your max.
 - **Bids you place are followed automatically.** When ShopGoodwill confirms a bid in this browser, the script notes the item and your max. It only reads the site's reply; it never places, changes or repeats a bid.
 - **Follow anything else** with **Alert me** on an item page. Optionally enter your max bid there, for example for bids placed on your phone.
+- **Favorites and alerts go together.** Favorite an item with ShopGoodwill's heart (on an item page or in search results) and its alerts turn on; un-favorite it and they turn off (alerts for your own bids stay). When you're signed in, the button reads **Favorite & alert me** and does both. Turn this off with **Favorites get alerts** in the settings.
+- **New listing alerts:** save words such as `casio g-shock` (optionally with a highest price) and get an alert when a new listing matches. Put `-` before words to skip, e.g. `pyrex -lid -parts`. Searches run every 10 minutes (adjustable), newest listings first; the first check only notes what is already listed. Several new matches at once are grouped into one alert that opens the results.
 - Alerts show as pop-ups on every open ShopGoodwill tab, with an optional sound and optional desktop notifications. Only one tab checks prices, so you don't get the same alert in every tab.
 - A **Bid alerts** button (bottom left) shows how many auctions you follow, turns red with the number you're outbid on, and opens a list with each item's status and the settings.
 - Checks every 5 minutes when days are left, down to every 5 seconds in the last 3 minutes. Ended auctions drop off the list after a day.
@@ -131,9 +147,9 @@ The tools don't depend on each other and work together on the same page.
 ## Privacy
 
 - The tools run only on `shopgoodwill.com` and `www.shopgoodwill.com`.
-- Shipping & Handling, Live Auction and Bid Alerts talk only to ShopGoodwill's own API (`buyerapi.shopgoodwill.com`), the same one the site uses. Your ZIP code goes there and nowhere else.
-- Bid Alerts reads prices from the public item details everyone sees. It never uses your login, password or session.
-- Your ZIP code, cached estimates, followed auctions, alert settings and chosen time zone are kept in your browser's storage for shopgoodwill.com, under keys starting with `sgwTools.`.
+- Shipping & Handling, Live Auction, Deal Check and Bid Alerts talk only to ShopGoodwill's own API (`buyerapi.shopgoodwill.com`), the same one the site uses. Your ZIP code goes there and nowhere else.
+- Bid Alerts reads prices from the public item details everyone sees, and searches the same public listings as the site's search box. It never uses your login, password or session. The only thing it does on your account is press ShopGoodwill's own favorite heart when you click **Favorite & alert me**.
+- Your ZIP code, cached estimates, followed auctions, saved search words, alert settings, Deal Check values and settings, and chosen time zone are kept in your browser's storage for shopgoodwill.com, under keys starting with `sgwTools.`.
 - No accounts, analytics, tracking or third-party servers.
 
 ## Installation
@@ -182,7 +198,8 @@ The free [Userscripts](https://github.com/quoid/userscripts) Safari extension sh
 - **Shipping & Handling:** set your ZIP code once. Hover over an estimate for the breakdown.
 - **Live Auction:** open any item page. Click the **Live** chip to pause or resume updates.
 - **Price Check:** click **Price check**, adjust the search terms if needed, then click a marketplace. Press <kbd>Enter</kbd> to open the first link, <kbd>Esc</kbd> to close.
-- **Bid Alerts:** bid as usual; the item is followed automatically. To follow something else, click **Alert me** on its page. Keep at least one ShopGoodwill tab open to get alerts.
+- **Deal Check:** on an item page, enter what the item is worth to you (or pick **To resell** and enter what it sells for). Open **Settings** once to add your sales tax and ZIP code.
+- **Bid Alerts:** bid as usual; the item is followed automatically. To follow something else, favorite it or click **Alert me** on its page. For new listing alerts, open **Bid alerts**, type your words under **New listing alerts** and click **Add** (on a search results page, your search words are filled in). Keep at least one ShopGoodwill tab open to get alerts.
 
 ### Local Time examples
 
@@ -234,6 +251,17 @@ On an item page, the script reads the same item details on a schedule, then upda
 
 Search terms and links are built in the browser from the listing title. Photos come from the item's details. The list of marketplaces is the `SOURCES` table near the top of the script, so adding one is a one-line change.
 
+### Deal Check
+
+On an item page, the script reads the item's details from ShopGoodwill's API (`minimumBid` for the next bid, `currentPrice` once ended, the Buy It Now price for buy-now-only listings) and asks `ItemDetail/CalculateShipping` for your ZIP code, then does the arithmetic in the browser:
+
+- **Total** = price + S&H + tax on both.
+- **To keep:** total ÷ what it's worth to you sets the verdict.
+- **To resell:** profit = sale price − selling fees − your shipping − total, and return = profit ÷ total.
+- **Bid up to** works backwards from the "good" line: for To keep, 90% of the value; for To resell, the lower of (net sale − least profit) and (net sale ÷ (1 + least return)). It then takes off tax and S&H and rounds down to the cent.
+
+The price is refreshed every minute while the tab is visible.
+
 ### Bid Alerts
 
 The script keeps a list of followed auctions in your browser's storage. One open ShopGoodwill tab is chosen to do the checking. If it closes, another tab takes over within seconds. That tab reads each auction's public details and compares the price, bid count and end time with what it saw last time. Alerts are shared with the other tabs through browser storage.
@@ -241,6 +269,10 @@ The script keeps a list of followed auctions in your browser's storage. One open
 To follow your own bids automatically, the script watches for the site's own `ItemBid/PlaceBid` request to finish. When the reply says the bid was accepted, it records the item and the amount. The request and reply are passed through untouched.
 
 Outbid detection compares the price with your max bid. With proxy bidding, the price never goes past the highest bidder's max, so a price above your max means someone else's max is higher.
+
+Favorites: the script listens for clicks on ShopGoodwill's heart buttons (`a.btn-heart`). Each heart names its item, and its label says whether the click adds or removes the favorite, so the script follows or stops following that item. **Favorite & alert me** follows the item and then presses the page's heart, if it isn't already a favorite. Nothing happens when you're signed out.
+
+New listing alerts: the checking tab sends your words to `Search/ItemListing`, the same search the site uses, sorted **Newly Listed**, and compares the item numbers with the ones it saw before. Items it hasn't seen, listed no earlier than the newest one it already knew about (with a few hours' allowance), are new. Words starting with `-` are left out of the search and used to skip titles that contain them.
 
 ### Updating selectors
 
@@ -292,6 +324,9 @@ ShopGoodwill's phone layout uses the same page structure as the desktop one, so 
 - The time zone picker is on item pages only. The choice applies everywhere on ShopGoodwill.
 - Shipping estimates are for US ZIP codes only, and are estimates: ShopGoodwill sets the final cost at checkout. Combined shipping for several items won by the same buyer is not reflected.
 - Live Auction updates the item page only, not the countdowns on search results.
+- Deal Check's verdict is only as good as the value you enter. Tax is applied to the item and S&H at one rate; some states don't tax shipping. Resale fees are a single percentage plus a fixed fee, not any marketplace's full fee table.
+- New listing alerts look at the newest 40 matches on each check. Very broad words (for example `watch`) can get more than 40 new listings between checks; use more specific words or a highest price.
+- Favoriting from the ShopGoodwill app or another browser doesn't turn alerts on here; only hearts clicked in this browser do.
 - Price Check links depend on each marketplace's search address. If one changes, the link may open a general search page instead.
 - Bid Alerts only runs while a ShopGoodwill tab is open, like any userscript. Close every tab and alerts stop until you open one again.
 - Bid Alerts follows bids placed in this browser automatically. For bids placed elsewhere (phone, another computer), click **Alert me** and enter your max.
@@ -314,6 +349,10 @@ ShopGoodwill's phone layout uses the same page structure as the desktop one, so 
 | The tab title keeps showing ⏱ | That's Live Auction following the item. Click the **Live** chip to pause it, or leave the item page. |
 | Price Check opens the wrong item | Edit the search terms in the panel, or click **Full title**. |
 | No bid alerts | Keep a ShopGoodwill tab open. Check that the item is in the **Bid alerts** list. |
+| No new listing alerts | Keep a ShopGoodwill tab open. The first check after adding words only notes what's listed; alerts start with listings that appear after it. Check that the search shows **checked …** in the **Bid alerts** panel. |
+| Favoriting doesn't turn alerts on | Make sure you're signed in and **Favorites get alerts** is ticked in the **Bid alerts** settings. |
+| Deal Check shows **S&H (set your ZIP in Settings)** | Open **Settings** in the Deal check box and enter your ZIP code. |
+| Deal Check total looks low | Add your sales tax in **Settings**. |
 | No desktop notifications | Open **Bid alerts**, tick **Desktop notifications**, and allow notifications for shopgoodwill.com in your browser and operating system. |
 | No alert sound | Click anywhere on the page once; browsers block sound until you do. Check that **Sound** is ticked. |
 | Outbid alert for a bid I raised | Update **My max bid** on the item page so the alert knows your new max. |
@@ -324,7 +363,7 @@ To report a problem, [open an issue](https://github.com/maxhayim/shopgoodwill.co
 
 Planned tools. Each will be its own script in `scripts/` that can be installed separately.
 
-- Auction watchlist synced with ShopGoodwill favorites
+- Follow every existing ShopGoodwill favorite in one click
 - Auction search improvements
 - Optional cross-device synchronization
 - Auction history

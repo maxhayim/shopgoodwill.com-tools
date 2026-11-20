@@ -1,7 +1,7 @@
 {
   "name": "shopgoodwill.com-tools",
-  "version": "2.0.0",
-  "description": "Open-source browser tools and enhancements for ShopGoodwill.com, including local time zone conversion, shipping & handling estimates, live auction updates, bid alerts and price checks, on desktop and mobile.",
+  "version": "2.1.0",
+  "description": "Open-source browser tools and enhancements for ShopGoodwill.com, including local time zone conversion, shipping & handling estimates, deal checks, live auction updates, bid and new listing alerts, and price checks, on desktop and mobile.",
   "private": true,
   "license": "MIT",
   "author": "maxhayim",

@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         shopgoodwill.com tools - Bid Alerts
 // @namespace    https://github.com/maxhayim/shopgoodwill.com-tools
-// @version      1.3.0
-// @description  Alerts you on ShopGoodwill when you're outbid, when someone bids on an item you follow, and before your auctions end. Works on desktop and mobile.
+// @version      1.4.0
+// @description  Alerts you on ShopGoodwill when you're outbid, when someone bids on an item you follow, before your auctions end, and when new listings match your search words. Favoriting an item turns its alerts on. Works on desktop and mobile.
 // @author       maxhayim
 // @license      MIT
 // @match        https://shopgoodwill.com/*
@@ -25,6 +25,7 @@
  *   - New bid: someone bid on an item you follow
  *   - Ending soon: 15, 5 and 1 minute(s) before the end (configurable)
  *   - Ended: the final price, and whether it was within your max
+ *   - New listing: a new item matches words you saved (e.g. "casio g-shock")
  *
  * What it follows:
  *   - Every bid you place in this browser. The script notices the site's own
@@ -32,6 +33,12 @@
  *     reads that reply; it never changes, sends or repeats a bid.
  *   - Any item you follow with the bell button on its page (optionally with
  *     your max bid, e.g. for bids placed on another device).
+ *   - Items you favorite with ShopGoodwill's heart. Un-favoriting stops their
+ *     alerts (alerts for your own bids stay on). "Alert me" also favorites
+ *     the item when you're signed in, so your favorites and alerts match.
+ *
+ * New listing alerts run your saved words through ShopGoodwill's own search,
+ * newest first, and tell you about listings that weren't there last time.
  *
  * Alerts appear as pop-ups on every open ShopGoodwill tab, with an optional
  * sound and optional desktop notifications. One tab does the checking (the
@@ -73,6 +80,10 @@
     leaderTtlMs: 8000,             // a checking tab that goes quiet this long is replaced
     loopMs: 2000,
     keepEndedMs: 24 * 60 * 60 * 1000,
+    heartSelector: 'a.btn-heart',
+    searchPageSize: 40,
+    maxSeenPerSearch: 400,
+    maxToastsPerSearch: 3,
     toastMs: 12000,
     storagePrefix: 'sgwTools.alerts.',
     cssPrefix: 'sgwt-alert'
@@ -82,7 +93,9 @@
     endingMinutes: [15, 5, 1],
     sound: true,
     desktop: false,
-    newBidAlerts: true
+    newBidAlerts: true,
+    favoriteAlerts: true,   // favoriting an item follows it
+    searchEveryMin: 10      // how often saved words are searched
   };
 
   // ---------------------------------------------------------------------------
@@ -235,6 +248,98 @@
     return { text: 'Following', kind: 'watch' };
   }
 
+  // Reads one of ShopGoodwill's favorite hearts: which item, and whether a
+  // click adds it to favorites (true) or removes it (false).
+  function heartInfo(el) {
+    if (!el || !el.getAttribute) return null;
+    var id = /^(\d+)$/.exec(String(el.getAttribute('aria-describedby') || '').trim());
+    var label = String(el.getAttribute('aria-label') || '') + ' ' + String(el.getAttribute('ptooltip') || '');
+    if (!id) return null;
+    return { itemId: id[1], adding: !/remove from/i.test(label) };
+  }
+
+  /**
+   * Splits saved search words into what ShopGoodwill searches for and words
+   * to leave out: "casio -kids -lot" searches "casio" and skips titles with
+   * "kids" or "lot".
+   */
+  function parseWords(text) {
+    var words = String(text || '').replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+    var include = [], exclude = [];
+    words.forEach(function (w) {
+      if (w.charAt(0) === '-' && w.length > 1) exclude.push(w.slice(1).toLowerCase());
+      else include.push(w);
+    });
+    return { query: include.join(' '), exclude: exclude };
+  }
+
+  function searchBody(search, pageSize) {
+    var w = parseWords(search.words);
+    var max = typeof search.maxPrice === 'number' && search.maxPrice > 0 ? String(search.maxPrice) : '999999';
+    return {
+      searchText: w.query, selectedGroup: '', selectedCategoryIds: '', selectedSellerIds: '',
+      lowPrice: '0', highPrice: max, searchBuyNowOnly: '', searchPickupOnly: 'false',
+      searchNoPickupOnly: 'false', searchOneCentShippingOnly: 'false', searchDescriptions: 'false',
+      searchClosedAuctions: 'false', closedAuctionEndingDate: '1/1/0001', closedAuctionDaysBack: '7',
+      searchCanadaShipping: 'false', searchInternationalShippingOnly: 'false',
+      sortColumn: '1', sortDescending: 'true',   // newly listed first
+      page: '1', pageSize: String(pageSize || 40), savedSearchId: 0, useBuyerPrefs: 'false',
+      searchUSOnlyShipping: 'false', categoryLevelNo: '1', categoryLevel: 1, categoryId: 0,
+      partNumber: '', catIds: ''
+    };
+  }
+
+  // The site's own results page for a saved search, newest first.
+  function searchPageUrl(search) {
+    var w = parseWords(search.words);
+    var max = typeof search.maxPrice === 'number' && search.maxPrice > 0 ? search.maxPrice : 999999;
+    // The results page only loads with its full set of parameters.
+    return '/categories/listing?st=' + encodeURIComponent(w.query) +
+      '&sg=&c=&s=&lp=0&hp=' + max + '&sbn=&spo=false&snpo=false&socs=false&sd=false&sca=false' +
+      '&caed=&cadb=7&scs=false&sis=false&col=1&p=1&ps=40&desc=true&ss=0&UseBuyerPrefs=true' +
+      '&sus=false&cln=1&catIds=&pn=&wc=false&mci=false&hmt=true&layout=grid';
+  }
+
+  /**
+   * Finds listings that are new since the last check. The first check only
+   * remembers what's there, so you aren't flooded with old listings.
+   *
+   * search: {words, maxPrice, seen: [itemId], mark: newest startTime seen}
+   * results: items from Search/ItemListing.
+   * Returns {fresh: [items], search: updated copy}.
+   */
+  function newListings(search, results, config) {
+    config = config || CONFIG;
+    var s = JSON.parse(JSON.stringify(search));
+    var exclude = parseWords(s.words).exclude;
+    var seen = {};
+    (s.seen || []).forEach(function (id) { seen[id] = true; });
+    var first = !s.seen;
+    var markMs = parseNaive(s.mark);
+    var fresh = [];
+    var newest = s.mark || null;
+    (results || []).forEach(function (it) {
+      if (!it || !it.itemId) return;
+      var id = String(it.itemId);
+      var title = String(it.title || '').toLowerCase();
+      var skip = exclude.some(function (w) { return title.indexOf(w) >= 0; });
+      var started = parseNaive(it.startTime);
+      if (it.startTime && (!newest || (started !== null && started > parseNaive(newest)))) newest = it.startTime;
+      if (seen[id]) return;
+      seen[id] = true;
+      s.seen = s.seen || [];
+      s.seen.push(id);
+      if (first || skip) return;
+      // Results are newest first; an item older than what we'd already seen
+      // (by more than a few hours) has just moved up, it isn't new.
+      if (markMs !== null && started !== null && started < markMs - 6 * 60 * 60 * 1000) return;
+      fresh.push(it);
+    });
+    s.seen = (s.seen || []).slice(-config.maxSeenPerSearch);
+    if (newest) s.mark = newest;
+    return { fresh: fresh, search: s };
+  }
+
   // Picks which tab does the checking. `lock` is {id, t} or null.
   function shouldLead(lock, myId, now, ttlMs) {
     if (!lock || !lock.id) return true;
@@ -280,7 +385,15 @@
     '@media (max-width: 480px){.P-fab{padding:9px 11px}.P-fab-label{display:none}.P-toasts{left:12px;right:12px;width:auto;max-width:none}.P-panel{left:12px;right:12px;width:auto;max-width:none}}',
     '@media (pointer: coarse){.P-follow-row input,.P-settings input[type=text]{font-size:16px}.P-follow{padding:8px 12px}.P-row .P-x,.P-toast button{padding:6px 8px;font-size:20px}.P-settings label{min-height:32px}}',
     '@media (prefers-color-scheme: dark){.P-panel,.P-toast{background:#1f2329;color:#eceff3}.P-panel h4,.P-row a,.P-toast a{color:#9cc3f5}.P-row{border-color:#333a44}.P-row small,.P-empty{color:#a9b2bd}.P-settings{border-color:#3a414b}.P-settings input[type=text]{background:#2a2f37;color:#eceff3;border-color:#4a525d}}',
-    '.P-note{color:#888;font-size:11px}'
+    '.P-note{color:#888;font-size:11px}',
+    '.P-searches{border-top:1px solid #dde3ea;margin-top:8px;padding-top:8px}',
+    '.P-searches h5{margin:0 0 4px;font:700 13px system-ui,sans-serif;color:#1f3a5f}',
+    '.P-add{display:flex;gap:6px;margin:6px 0 4px}',
+    '.P-add input{min-width:0;padding:4px 6px;border:1px solid #bbc;border-radius:4px;font:13px system-ui,sans-serif}',
+    '.P-add input:first-child{flex:1}.P-add input:nth-child(2){width:64px}',
+    '.P-add-btn{all:unset;cursor:pointer;background:#1f3a5f;color:#fff;border-radius:4px;padding:4px 12px;font:600 13px system-ui,sans-serif}',
+    '@media (pointer: coarse){.P-add input{font-size:16px;padding:6px}.P-add-btn{padding:8px 14px}}',
+    '@media (prefers-color-scheme: dark){.P-searches{border-color:#3a414b}.P-searches h5{color:#9cc3f5}.P-add input{background:#2a2f37;color:#eceff3;border-color:#4a525d}.P-add-btn{background:#9cc3f5;color:#1f2329}}'
   ].join('\n');
 
   function start(win, doc, config) {
@@ -304,6 +417,20 @@
       var out = {};
       Object.keys(DEFAULT_PREFS).forEach(function (k) { out[k] = p[k] === undefined ? DEFAULT_PREFS[k] : p[k]; });
       return out;
+    }
+    function searches() { var v = read('searches', []); return Array.isArray(v) ? v : []; }
+    function saveSearches(v) { write('searches', v); renderFab(); renderPanel(); }
+    function updateSearch(id, fn) {
+      var all = searches();
+      for (var i = 0; i < all.length; i++) {
+        if (all[i].id === id) {
+          var next = fn(all[i]);
+          if (next) all[i] = next; else all.splice(i, 1);
+          saveSearches(all);
+          return next;
+        }
+      }
+      return null;
     }
     function updateItem(itemId, fn) {
       var all = items();
@@ -416,7 +543,7 @@
       x.setAttribute('aria-label', 'Dismiss');
       x.addEventListener('click', function () { t.remove(); });
       var a = doc.createElement('a');
-      a.href = '/item/' + ev.itemId;
+      a.href = ev.href || '/item/' + ev.itemId;
       a.textContent = ev.title || 'Item ' + ev.itemId;
       t.appendChild(x);
       t.appendChild(a);
@@ -451,7 +578,7 @@
       if (!prefs().desktop || typeof win.Notification !== 'function' || win.Notification.permission !== 'granted') return;
       try {
         var n = new win.Notification(ev.title || 'ShopGoodwill', { body: ev.text, tag: 'sgwt-' + ev.itemId + '-' + ev.type });
-        n.onclick = function () { win.focus(); win.location.href = '/item/' + ev.itemId; };
+        n.onclick = function () { win.focus(); win.location.href = ev.href || '/item/' + ev.itemId; };
       } catch (e) { /* not allowed */ }
     }
 
@@ -463,6 +590,7 @@
         } catch (err) { /* ignore */ }
       }
       if (e.key === S + 'items') { renderFab(); renderPanel(); renderFollow(); }
+      if (e.key === S + 'searches') { renderFab(); renderPanel(); }
     });
 
     // --- Checking (one tab at a time) -------------------------------------------
@@ -500,8 +628,65 @@
         .then(function () { delete inFlight[itemId]; });
     }
 
+    var searchInFlight = {};
+    function checkSearch(search) {
+      searchInFlight[search.id] = true;
+      win.fetch(config.apiBase + 'Search/ItemListing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(searchBody(search, config.searchPageSize))
+      })
+        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function (j) {
+          var results = j && j.searchResults && j.searchResults.items || [];
+          var fresh = [];
+          updateSearch(search.id, function (cur) {
+            var out = newListings(cur, results, config);
+            fresh = out.fresh;
+            out.search.lastCheck = Date.now();
+            out.search.error = false;
+            out.search.found = (cur.found || 0) + fresh.length;
+            return out.search;
+          });
+          var label = '"' + search.words + '"';
+          var shown = fresh.slice(0, fresh.length > config.maxToastsPerSearch ? config.maxToastsPerSearch - 1 : fresh.length);
+          shown.forEach(function (it) {
+            var ev = {
+              type: 'newlisting', level: 'info', itemId: String(it.itemId), title: it.title,
+              text: 'New listing for ' + label + ': ' + formatMoney(it.currentPrice) + (it.numBids ? '' : ', no bids yet') + '.'
+            };
+            toast(ev, true); desktop(ev);
+          });
+          if (fresh.length > shown.length) {
+            var more = fresh.length - shown.length;
+            var ev = {
+              type: 'newlisting', level: 'info', itemId: 'search-' + search.id, href: searchPageUrl(search),
+              title: (shown.length ? more + ' more' : more) + ' new listings for ' + label,
+              text: 'See them all, newest first.'
+            };
+            toast(ev, true); desktop(ev);
+          }
+          if (fresh.length) beep('info');
+        })
+        .catch(function () {
+          updateSearch(search.id, function (cur) { cur.lastCheck = Date.now(); cur.error = true; return cur; });
+        })
+        .then(function () { delete searchInFlight[search.id]; });
+    }
+
+    function loopSearches(now) {
+      var every = Math.max(2, Number(prefs().searchEveryMin) || DEFAULT_PREFS.searchEveryMin) * 60000;
+      searches().forEach(function (s, i) {
+        if (searchInFlight[s.id]) return;
+        // Spread searches out a little so they don't all go at once.
+        var due = (s.lastCheck || 0) + every + i * 5000;
+        if (!s.lastCheck || now >= due) checkSearch(s);
+      });
+    }
+
     function loop() {
       if (!isLeader()) return;
+      loopSearches(Date.now());
       var all = items();
       var now = Date.now();
       var changed = false;
@@ -528,6 +713,52 @@
       var lock = read('leader', null);
       if (lock && lock.id === tabId) { try { ls.removeItem(S + 'leader'); } catch (e) { /* ignore */ } }
     });
+
+    // --- Favorites and alerts, together --------------------------------------------
+    var clickingHeart = false;
+    function siteHeart(itemId) {
+      var hearts = doc.querySelectorAll(config.heartSelector);
+      for (var i = 0; i < hearts.length; i++) {
+        var h = heartInfo(hearts[i]);
+        if (h && h.itemId === itemId) return hearts[i];
+      }
+      return null;
+    }
+    function signedIn() {
+      var links = doc.querySelectorAll('header a, header button, nav a');
+      for (var i = 0; i < links.length; i++) if (/^\s*sign out\s*$/i.test(links[i].textContent || '')) return true;
+      return false;
+    }
+    function cardTitle(heart, itemId) {
+      var card = heart.closest && heart.closest('.feat-item');
+      var a = card && card.querySelector('a.feat-item_name');
+      return a && a.textContent.trim() ? a.textContent.trim() : titleFor(itemId);
+    }
+    function followItem(itemId, title, maxBid, source) {
+      updateItem(itemId, function (r) {
+        if (r) { if (maxBid > 0) r.maxBid = maxBid; return r; }
+        return { itemId: itemId, title: title, maxBid: maxBid > 0 ? maxBid : null, source: source, fired: {}, lastPrice: null, lastBids: null, addedAt: Date.now() };
+      });
+      nextCheck[itemId] = 0;
+      primeAudio();
+    }
+    // A click on ShopGoodwill's heart (anywhere: item page or search results)
+    // turns alerts on or off with the favorite. Alerts for your own bids stay.
+    doc.addEventListener('click', function (e) {
+      if (clickingHeart || !prefs().favoriteAlerts) return;
+      var heart = e.target && e.target.closest ? e.target.closest(config.heartSelector) : null;
+      var h = heartInfo(heart);
+      if (!h || !signedIn()) return;
+      var rec = items()[h.itemId];
+      if (h.adding) {
+        if (!rec) {
+          followItem(h.itemId, cardTitle(heart, h.itemId), null, 'favorite');
+          showToast({ level: 'success', itemId: h.itemId, title: cardTitle(heart, h.itemId), text: 'Favorited. Alerts are on for new bids and the last minutes.' });
+        }
+      } else if (rec && rec.source !== 'bid') {
+        updateItem(h.itemId, function () { return null; });
+      }
+    }, true);
 
     // --- Follow button on item pages ------------------------------------------------
     var followRow = null;
@@ -556,11 +787,14 @@
             updateItem(id, function () { return null; });
           } else {
             var max = parseFloat(String(input.value).replace(/[$,]/g, ''));
-            updateItem(id, function () {
-              return { itemId: id, title: titleFor(id), maxBid: max > 0 ? max : null, source: 'follow', fired: {}, lastPrice: null, lastBids: null, addedAt: Date.now() };
-            });
-            nextCheck[id] = 0;
-            primeAudio();
+            followItem(id, titleFor(id), max, 'follow');
+            // Favorite it on ShopGoodwill too, so favorites and alerts match.
+            var heart = prefs().favoriteAlerts && signedIn() ? siteHeart(id) : null;
+            var h = heartInfo(heart);
+            if (h && h.adding) {
+              clickingHeart = true;
+              try { heart.click(); } finally { clickingHeart = false; }
+            }
           }
         });
         input.addEventListener('change', function () {
@@ -575,9 +809,14 @@
       var rec = items()[id];
       var b = followRow.querySelector('button');
       b.setAttribute('aria-pressed', rec ? 'true' : 'false');
+      var linked = prefs().favoriteAlerts && signedIn() && !!siteHeart(id);
       b.innerHTML = BELL;
-      b.appendChild(doc.createTextNode(rec ? (rec.source === 'bid' ? 'Alerts on (you bid)' : 'Following') : 'Alert me'));
-      b.title = rec ? 'Click to stop alerts for this item' : 'Get alerts for new bids, outbids and the last minutes';
+      b.appendChild(doc.createTextNode(rec
+        ? (rec.source === 'bid' ? 'Alerts on (you bid)' : 'Following')
+        : (linked ? 'Favorite & alert me' : 'Alert me')));
+      b.title = rec
+        ? 'Click to stop alerts for this item (it stays in your favorites)'
+        : 'Get alerts for new bids, outbids and the last minutes' + (linked ? ', and add it to your ShopGoodwill favorites' : '');
       var inp = followRow.querySelector('input');
       if (doc.activeElement !== inp) inp.value = rec && typeof rec.maxBid === 'number' ? rec.maxBid.toFixed(2) : inp.value;
     }
@@ -613,7 +852,8 @@
       var count = el('b', null, outbid ? outbid + ' outbid' : String(active.length));
       fab.appendChild(count);
       fab.classList.toggle(P + '-has-outbid', outbid > 0);
-      fab.title = active.length + ' auction(s) followed';
+      var ns = searches().length;
+      fab.title = active.length + ' auction(s) followed' + (ns ? ', ' + ns + ' new listing alert(s)' : '');
     }
 
     function closePanel() { if (panelEl) { panelEl.remove(); panelEl = null; } }
@@ -624,6 +864,9 @@
       var all = items();
       var now = Date.now();
       var p = prefs();
+      // Keep what's being typed in the panel across redraws.
+      var typed = [].map.call(panelEl.querySelectorAll('input[type=text]'), function (i) { return i.value; });
+      var focusAt = [].indexOf.call(panelEl.querySelectorAll('input[type=text]'), doc.activeElement);
       panelEl.textContent = '';
       var h = el('h4', null, 'Bid alerts');
       var close = el('button', null, '×');
@@ -637,7 +880,7 @@
         var ea = all[a].ended ? 1 : 0, eb = all[b].ended ? 1 : 0;
         return ea - eb || (all[a].endAt || 9e15) - (all[b].endAt || 9e15);
       });
-      if (!ids.length) panelEl.appendChild(el('div', 'empty', 'Nothing followed yet. Bids you place are added automatically, or click "Alert me" on an item page.'));
+      if (!ids.length) panelEl.appendChild(el('div', 'empty', 'Nothing followed yet. Bids you place are added automatically, or favorite an item or click "Alert me" on its page.'));
       ids.forEach(function (id) {
         var r = all[id];
         var st = statusOf(r, now);
@@ -663,7 +906,10 @@
         panelEl.appendChild(row);
       });
 
+      renderSearches(p);
+
       var s = el('div', 'settings');
+      s.appendChild(checkbox('Favorites get alerts', p.favoriteAlerts, function (v) { setPref('favoriteAlerts', v); renderFollow(); }));
       s.appendChild(checkbox('Sound', p.sound, function (v) { setPref('sound', v); if (v) primeAudio(); }));
       s.appendChild(checkbox('Alerts for new bids', p.newBidAlerts, function (v) { setPref('newBidAlerts', v); }));
       var desk = checkbox('Desktop notifications', p.desktop && win.Notification && win.Notification.permission === 'granted', function (v, input) {
@@ -688,8 +934,99 @@
       });
       endLabel.appendChild(endInput);
       s.appendChild(endLabel);
+      var everyLabel = doc.createElement('label');
+      everyLabel.textContent = 'Check for new listings every (minutes):';
+      var everyInput = doc.createElement('input');
+      everyInput.type = 'text';
+      everyInput.setAttribute('inputmode', 'numeric');
+      everyInput.value = String(p.searchEveryMin);
+      everyInput.addEventListener('change', function () {
+        var n = Math.round(Number(everyInput.value));
+        n = n >= 2 && n <= 1440 ? n : DEFAULT_PREFS.searchEveryMin;
+        setPref('searchEveryMin', n);
+        everyInput.value = String(n);
+      });
+      everyLabel.appendChild(everyInput);
+      s.appendChild(everyLabel);
       s.appendChild(el('div', 'note', 'Alerts work while a ShopGoodwill tab is open. Prices are checked more often as auctions near their end.'));
       panelEl.appendChild(s);
+      var inputs = panelEl.querySelectorAll('input[type=text]');
+      if (typed.length === inputs.length) {
+        for (var k = 0; k < inputs.length; k++) inputs[k].value = typed[k];
+        if (focusAt >= 0) inputs[focusAt].focus();
+      }
+    }
+
+    // New listing alerts: saved words, checked against the newest listings.
+    function renderSearches(p) {
+      var box = el('div', 'searches');
+      box.appendChild(el('h5', null, 'New listing alerts'));
+      var list = searches();
+      if (!list.length) box.appendChild(el('div', 'empty', 'Get an alert when a new listing matches your words. Put - before words to skip, e.g. casio g-shock -parts.'));
+      list.forEach(function (sr) {
+        var row = el('div', 'row');
+        var a = doc.createElement('a');
+        a.href = searchPageUrl(sr);
+        a.textContent = sr.words;
+        var x = el('button', 'x', '×');
+        x.type = 'button';
+        x.title = 'Delete this alert';
+        x.addEventListener('click', function () { updateSearch(sr.id, function () { return null; }); });
+        var info = doc.createElement('small');
+        var bits = [];
+        if (sr.maxPrice) bits.push('up to ' + formatMoney(sr.maxPrice));
+        bits.push(!sr.lastCheck ? 'checking…' : sr.error ? 'last check failed, retrying' : 'checked ' + ago(Date.now() - sr.lastCheck));
+        if (sr.found) bits.push(sr.found + ' new found');
+        info.textContent = bits.join(' · ');
+        row.appendChild(a);
+        row.appendChild(x);
+        row.appendChild(info);
+        box.appendChild(row);
+      });
+      var add = el('div', 'add');
+      var words = doc.createElement('input');
+      words.type = 'text';
+      words.placeholder = 'Words, e.g. pyrex -lid';
+      words.setAttribute('aria-label', 'Words to look for in new listings');
+      var q = /[?&]st=([^&]*)/.exec(win.location.search || '');
+      if (q) { try { words.value = decodeURIComponent(q[1].replace(/\+/g, ' ')); } catch (e) { /* ignore */ } }
+      var max = doc.createElement('input');
+      max.type = 'text';
+      max.placeholder = 'Max $';
+      max.setAttribute('inputmode', 'decimal');
+      max.setAttribute('aria-label', 'Highest price (optional)');
+      var btn = el('button', 'add-btn', 'Add');
+      btn.type = 'button';
+      function addSearch() {
+        var w = words.value.replace(/\s+/g, ' ').trim();
+        if (!parseWords(w).query) { words.focus(); return; }
+        var m = parseFloat(String(max.value).replace(/[$,]/g, ''));
+        var all = searches();
+        if (all.some(function (x) { return x.words.toLowerCase() === w.toLowerCase(); })) return;
+        all.push({ id: Math.random().toString(36).slice(2, 10), words: w, maxPrice: m > 0 ? m : null, created: Date.now() });
+        words.value = '';
+        max.value = '';
+        saveSearches(all);
+        primeAudio();
+        loop();
+      }
+      btn.addEventListener('click', addSearch);
+      [words, max].forEach(function (i) {
+        i.addEventListener('keydown', function (e) { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); addSearch(); } });
+      });
+      add.appendChild(words);
+      add.appendChild(max);
+      add.appendChild(btn);
+      box.appendChild(add);
+      box.appendChild(el('div', 'note', 'The first check just notes what is listed now; after that, each new match is an alert.'));
+      panelEl.appendChild(box);
+    }
+
+    function ago(ms) {
+      var m = Math.floor(ms / 60000);
+      if (m < 1) return 'just now';
+      if (m < 60) return m + 'm ago';
+      return Math.floor(m / 60) + 'h ago';
     }
 
     function checkbox(text, checked, onChange) {
@@ -739,6 +1076,11 @@
     evaluate: evaluate,
     statusOf: statusOf,
     shouldLead: shouldLead,
+    heartInfo: heartInfo,
+    parseWords: parseWords,
+    searchBody: searchBody,
+    searchPageUrl: searchPageUrl,
+    newListings: newListings,
     start: start
   };
 });

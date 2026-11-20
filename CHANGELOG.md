@@ -2,6 +2,27 @@
 
 All notable changes to this project are documented here. This project uses [Semantic Versioning](https://semver.org/).
 
+## v2.1.0 — Deal Check, favorites with alerts, new listing alerts
+
+Release date: November 19, 2026
+
+- **New: Deal Check** (`shopgoodwill-deal-check.user.js` 2.1.0). A box on every item page that says whether the item is worth the price:
+  - Adds up the next bid (or Buy It Now price) + shipping & handling to your ZIP code + your sales tax.
+  - **To keep:** compares the total with what the item is worth to you: Great deal, Good deal, Fair price or Not worth it.
+  - **To resell:** works out the profit and return after selling fees and your shipping to the buyer: Great flip, Worth flipping, Thin margin or Would lose money.
+  - Shows the most you can bid and still have a good deal, and lets you try a bid of your own.
+  - Fees, least profit, least return, tax and ZIP code are adjustable; the ZIP is shared with Shipping & Handling.
+- **Bid Alerts 1.4.0:**
+  - **Favorites and alerts go together.** Favoriting an item with ShopGoodwill's heart turns its alerts on; un-favoriting turns them off (alerts for your own bids stay). When you're signed in, **Alert me** becomes **Favorite & alert me** and does both. Can be turned off in the settings.
+  - **New listing alerts.** Save words (with an optional highest price, and `-word` to skip titles) and get an alert when a new listing matches. Checked every 10 minutes by default, newest first; many matches at once are grouped into one alert that opens the results.
+- README and SECURITY updated for the new features.
+- 13 new automated tests (90 in total).
+- Checked on live ShopGoodwill pages in Chrome:
+  - Deal Check on an auction (To keep and To resell, with Settings) and on a Buy It Now listing, and at phone width (390px).
+  - **Favorite & alert me** and the site's heart, in both directions.
+  - The New listing alerts panel, the search against ShopGoodwill's API, and the results link.
+- Not yet checked: a new listing alert arriving from the scheduled check (the installed older Bid Alerts held the checking role during the test), and real phones.
+
 ## v2.0.0 — Local Time & mobile support
 
 Release date: November 19, 2026
