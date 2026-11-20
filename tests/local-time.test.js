@@ -8,7 +8,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 
-const sgw = require(path.join(__dirname, '..', 'scripts', 'shopgoodwill-eastern-time.user.js'));
+const sgw = require(path.join(__dirname, '..', 'scripts', 'shopgoodwill-local-time.user.js'));
 
 const conv = (text, date) => {
   const r = sgw.convertText(text, date ? { date } : undefined);
@@ -96,6 +96,8 @@ function makeWindow() {
     disconnect() { observers.splice(observers.indexOf(this), 1); }
   }
   const win = {
+    // Tests run in Eastern unless they say otherwise, whatever the machine's zone.
+    localStorage: { getItem: () => 'America/New_York', setItem() {} },
     MutationObserver: FakeObserver,
     setTimeout(fn) { timers.push(fn); return timers.length; },
     clearTimeout() { timers.length = 0; },
@@ -369,11 +371,13 @@ test('"Ends On" late at night moves the date too', () => {
 // ---------------------------------------------------------------------------
 // Eastern end time beside the item page countdown.
 // ---------------------------------------------------------------------------
-test('shortEasternEnd reads Pacific or already-converted Ends On values', () => {
-  assert.equal(sgw.shortEasternEnd('11/19/2026 06:02:00 PM PT'), 'Thu 11/19, 9:02 PM EST');
-  assert.equal(sgw.shortEasternEnd('11/19/2026 09:02:00 PM EST'), 'Thu 11/19, 9:02 PM EST');
-  assert.equal(sgw.shortEasternEnd('7/4/2026 10:30:00 PM PT'), 'Sun 7/5, 1:30 AM EDT');
-  assert.equal(sgw.shortEasternEnd('soon'), null);
+test('shortLocalEnd formats an Ends On value in any zone', () => {
+  assert.equal(sgw.shortLocalEnd('11/19/2026 06:02:00 PM PT'), 'Thu 11/19, 9:02 PM EST');
+  assert.equal(sgw.shortLocalEnd('11/19/2026 06:02:00 PM PT', 'America/Chicago'), 'Thu 11/19, 8:02 PM CST');
+  assert.equal(sgw.shortLocalEnd('7/4/2026 10:30:00 PM PT'), 'Sun 7/5, 1:30 AM EDT');
+  assert.equal(sgw.shortLocalEnd('7/4/2026 10:30:00 PM PT', 'Pacific/Honolulu'), 'Sat 7/4, 7:30 PM HST');
+  assert.equal(sgw.shortLocalEnd('11/19/2026 9:02:00 PM EST'), null);
+  assert.equal(sgw.shortLocalEnd('soon'), null);
 });
 
 function itemPage(endsText, timeLeft) {
@@ -407,4 +411,93 @@ test('no Ends On line: the countdown is left alone', () => {
   const p = itemPage('', '5h 18m');
   sgw.scan(p.body);
   assert.equal(p.value.nextElementSibling.tagName, 'P');
+});
+
+// ---------------------------------------------------------------------------
+// Any time zone.
+// ---------------------------------------------------------------------------
+const nov = { year: 2026, month: 11, day: 19 };
+const jul = { year: 2026, month: 7, day: 4 };
+const inZone = (text, zone, date, now) => {
+  const r = sgw.convertText(text, { zone, date, now });
+  return r && r.text;
+};
+
+test('converts to US zones with the right standard/daylight names', () => {
+  assert.equal(inZone('6:02:00 PM PT', 'America/Chicago', nov), '8:02:00 PM CST');
+  assert.equal(inZone('6:02:00 PM PT', 'America/Denver', nov), '7:02:00 PM MST');
+  assert.equal(inZone('6:02:00 PM PT', 'America/Phoenix', nov), '7:02:00 PM MST');
+  assert.equal(inZone('6:02:00 PM PT', 'America/Phoenix', jul), '6:02:00 PM MST');
+  assert.equal(inZone('6:02:00 PM PT', 'America/Chicago', jul), '8:02:00 PM CDT');
+  assert.equal(inZone('6:02:00 PM PT', 'America/Anchorage', nov), '5:02:00 PM AKST');
+  assert.equal(inZone('6:02:00 PM PT', 'Pacific/Honolulu', nov), '4:02:00 PM HST');
+  assert.equal(inZone('6:02:00 PM PT', 'America/Los_Angeles', nov), '6:02:00 PM PST');
+});
+
+test('converts to zones outside the US, including date changes', () => {
+  assert.equal(inZone('11/19/2026 06:02:00 PM PT', 'Europe/London'), '11/20/2026 2:02:00 AM GMT');
+  assert.equal(inZone('7/4/2026 10:30:00 AM PT', 'Europe/London'), '7/4/2026 6:30:00 PM GMT+1');
+  assert.equal(inZone('11/19/2026 06:02:00 PM PT', 'Asia/Tokyo'), '11/20/2026 11:02:00 AM GMT+9');
+  assert.equal(inZone('6:02:00 PM PT', 'Asia/Kolkata', nov), '7:32:00 AM GMT+5:30 (next day)');
+  assert.equal(inZone('11:00:00 AM PT', 'Pacific/Honolulu', nov), '9:00:00 AM HST');
+});
+
+test('without a closing date, today (Pacific) is used for daylight saving', () => {
+  const summerNow = Date.UTC(2026, 6, 4, 19);   // July 4, noon Pacific
+  const winterNow = Date.UTC(2026, 11, 4, 20);  // Dec 4, noon Pacific
+  assert.equal(inZone('6:00:00 PM PT', 'America/Chicago', null, summerNow), '8:00:00 PM CDT');
+  assert.equal(inZone('6:00:00 PM PT', 'America/Chicago', null, winterNow), '8:00:00 PM CST');
+  const r = sgw.convertText('6:00:00 PM PT', { zone: 'America/Chicago', now: winterNow });
+  assert.equal(r.result.assumedDate, true);
+});
+
+test('daylight-saving changeover nights in a non-Eastern zone', () => {
+  // US clocks fall back Nov 1 2026: 1:30 AM PDT and 1:30 AM PST are an hour apart.
+  const nov1 = { year: 2026, month: 11, day: 1 };
+  assert.equal(inZone('1:30:00 AM PDT', 'America/Chicago', nov1), '2:30:00 AM CST');
+  assert.equal(inZone('1:30:00 AM PST', 'America/Chicago', nov1), '3:30:00 AM CST');
+  assert.equal(inZone('11:30:00 PM PDT', 'America/Denver', { year: 2026, month: 10, day: 31 }), '12:30:00 AM MDT (next day)');
+  // Europe changes on a different weekend than the US.
+  assert.equal(inZone('10:00:00 AM PDT', 'Europe/Berlin', { year: 2026, month: 3, day: 20 }), '6:00:00 PM GMT+1');
+  assert.equal(inZone('10:00:00 AM PDT', 'Europe/Berlin', { year: 2026, month: 4, day: 20 }), '7:00:00 PM GMT+2');
+});
+
+test('Eastern zones keep the original Eastern behaviour', () => {
+  assert.equal(sgw.isEasternZone('America/New_York'), true);
+  assert.equal(sgw.isEasternZone('America/Toronto'), true);
+  assert.equal(sgw.isEasternZone('America/Detroit'), true);
+  assert.equal(sgw.isEasternZone('America/Chicago'), false);
+  assert.equal(sgw.isEasternZone('America/Cancun'), false);
+  assert.equal(inZone('11:59:59 PM PDT', 'America/Toronto'), '2:59:59 AM ET (next day)');
+});
+
+test('zone choice: saved zone, else the device zone, else the fallback', () => {
+  assert.equal(sgw.resolveZone('America/Chicago', 'America/New_York', 'America/New_York'), 'America/Chicago');
+  assert.equal(sgw.resolveZone('auto', 'Europe/Paris', 'America/New_York'), 'Europe/Paris');
+  assert.equal(sgw.resolveZone(null, 'Europe/Paris', 'America/New_York'), 'Europe/Paris');
+  assert.equal(sgw.resolveZone('Not/AZone', null, 'America/New_York'), 'America/New_York');
+  assert.equal(sgw.isValidZone('Asia/Tokyo'), true);
+  assert.equal(sgw.isValidZone('Mars/Base'), false);
+  assert.equal(typeof sgw.deviceZone(), 'string');
+});
+
+test('start() converts to the saved zone', () => {
+  const { win, doc } = makeWindow();
+  win.localStorage = { getItem: () => 'America/Chicago', setItem() {} };
+  const td = new Element('td', '', ['11/19/2026 06:02:00 PM PT']);
+  doc.body.appendChild(new Element('tr', '', [new Element('th', '', ['Ends On:']), td]));
+  const h = sgw.start(win, doc);
+  assert.equal(h.zone, 'America/Chicago');
+  assert.equal(td.textContent, '11/19/2026 8:02:00 PM CST');
+  assert.equal(td.getAttribute('data-sgw-et-source'), '11/19/2026 06:02:00 PM PT');
+  h.stop();
+});
+
+test('countdown ticks do not trigger rescans; new Pacific times do', () => {
+  const C = sgw.CONFIG;
+  assert.equal(sgw.mutationMatters({ type: 'characterData', target: { nodeValue: '5h 12m' } }, C), false);
+  assert.equal(sgw.mutationMatters({ type: 'characterData', target: { nodeValue: '6:02:00 PM PDT' } }, C), true);
+  assert.equal(sgw.mutationMatters({ type: 'childList', addedNodes: [{ nodeType: 1, className: 'sgwt-et-ends' }] }, C), false);
+  assert.equal(sgw.mutationMatters({ type: 'childList', addedNodes: [{ nodeType: 3, nodeValue: '4:59' }] }, C), false);
+  assert.equal(sgw.mutationMatters({ type: 'childList', addedNodes: [{ nodeType: 1, className: 'row' }] }, C), true);
 });

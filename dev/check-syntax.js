@@ -3,6 +3,8 @@
 // that each userscript's metadata is complete and consistent:
 // - @version is semver and not newer than the repository version in package.json
 // - @updateURL and @downloadURL point at the script's own file on main
+// - renamed scripts: the old file stays as an exact copy of the new one, so
+//   installs made from the old address update once and then follow the new one
 const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -11,6 +13,11 @@ const root = path.join(__dirname, '..');
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 const RAW = 'https://raw.githubusercontent.com/maxhayim/shopgoodwill.com-tools/main/scripts/';
 let failed = false;
+
+// Old file name -> new file name.
+const RENAMED = {
+  'shopgoodwill-eastern-time.user.js': 'shopgoodwill-local-time.user.js'
+};
 
 const semver = (v) => /^\d+\.\d+\.\d+$/.test(v || '');
 const cmp = (a, b) => {
@@ -33,6 +40,13 @@ for (const dir of ['scripts', 'tests', 'dev']) {
       fail(file + '\n' + err.stderr);
     }
     if (!name.endsWith('.user.js')) continue;
+
+    if (RENAMED[name]) {
+      const copy = fs.readFileSync(path.join(root, file), 'utf8');
+      const target = fs.readFileSync(path.join(root, dir, RENAMED[name]), 'utf8');
+      if (copy !== target) fail(file + ': must be an exact copy of ' + RENAMED[name] + ' (renamed script)');
+      continue;
+    }
 
     const src = fs.readFileSync(path.join(root, file), 'utf8');
     const meta = (key) => {

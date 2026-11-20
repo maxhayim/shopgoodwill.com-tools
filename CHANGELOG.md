@@ -2,6 +2,32 @@
 
 All notable changes to this project are documented here. This project uses [Semantic Versioning](https://semver.org/).
 
+## v2.0.0 — Local Time & mobile support
+
+Release date: November 19, 2026
+
+- **Eastern Time is now Local Time** (`shopgoodwill-local-time.user.js` 2.0.0). Ending times are converted to the device's own time zone, detected with `Intl.DateTimeFormat().resolvedOptions().timeZone`, instead of always Eastern. Every time zone the browser knows is supported (418 in Chrome). Tap or click the end time next to **Time left** on an item page to pick another zone or go back to **Automatic**. Eastern zones keep the original, fully tested Eastern conversion, so results there are unchanged. Other zones use the browser's time zone database, including each zone's own daylight-saving dates.
+  - Existing installs update automatically: the old `shopgoodwill-eastern-time.user.js` address serves the same script, which points future updates at the new address.
+  - The original Pacific text is kept in `data-sgw-et-source`, so the end time beside the countdown is always worked out from ShopGoodwill's own value.
+  - Countdown ticks no longer trigger page rescans, which saves battery on phones.
+- **Mobile support** for every tool, in Safari's normal mobile view on iPhone and iPad and in Firefox for Android:
+  - 16px text in inputs, so iPhone Safari doesn't zoom in when you tap them.
+  - Larger tap targets on touch screens.
+  - Floating panels clear the iPhone home bar, fit narrow screens and follow dark mode.
+  - The Bid alerts button shrinks to a bell and a count on narrow screens.
+  - The Price Check panel no longer pops up the keyboard.
+  - The Desktop notifications setting is hidden where the browser has no notifications (iPhone Safari).
+  - Every script now runs once per page, even if injected twice.
+  - Versions: Shipping & Handling 1.2.0, Price Check 1.2.0, Bid Alerts 1.3.0, Live Auction 1.4.0.
+- README: install steps for iPhone/iPad and Android, mobile notes, time zone picker.
+- 9 new automated tests (77 in total), passing whatever time zone the test machine is set to.
+- Checked in desktop Chrome with ShopGoodwill's phone layout at 390px:
+  - Chicago conversion on the real item page markup.
+  - The time zone picker.
+  - No sideways scrolling.
+  - The compact Bid alerts button.
+- Not yet checked on a real iPhone or Android phone, or in Firefox or desktop Safari.
+
 ## v1.3.0 — End time beside the countdown
 
 Release date: November 19, 2026

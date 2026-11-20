@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         shopgoodwill.com tools - Live Auction
 // @namespace    https://github.com/maxhayim/shopgoodwill.com-tools
-// @version      1.3.0
-// @description  Keeps the price, bid count and a to-the-second countdown up to date on ShopGoodwill item pages without reloading.
+// @version      1.4.0
+// @description  Keeps the price, bid count and a to-the-second countdown up to date on ShopGoodwill item pages without reloading. Works on desktop and mobile.
 // @author       maxhayim
 // @license      MIT
 // @match        https://shopgoodwill.com/*
@@ -33,6 +33,9 @@
   if (typeof module === 'object' && module && module.exports) {
     module.exports = api;
   } else if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+    // Run once per page, even if the script is injected twice.
+    if (window.__sgwtLiveAuction) return;
+    window.__sgwtLiveAuction = true;
     api.start(window, document);
   }
 })(function () {
@@ -216,6 +219,7 @@
     '.P-chip.P-paused{background:#eee;color:#666}.P-chip.P-paused i{background:#999;animation:none}',
     '.P-chip.P-ended{background:#f4e6e6;color:#8b1c1c}.P-chip.P-ended i{background:#8b1c1c;animation:none}',
     '@keyframes P-pulse{0%,100%{opacity:1}50%{opacity:.25}}',
+    '@media (pointer: coarse){.P-chip{padding:4px 10px}}',
     '.P-final{color:#c62828!important;font-weight:700}',
     '.P-flash{animation:P-flash 1.8s ease-out}',
     '@keyframes P-flash{0%{background:#fff3a0}100%{background:transparent}}'

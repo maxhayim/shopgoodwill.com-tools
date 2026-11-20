@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         shopgoodwill.com tools - Shipping & Handling
 // @namespace    https://github.com/maxhayim/shopgoodwill.com-tools
-// @version      1.1.0
-// @description  Shows estimated shipping & handling and the total cost for your ZIP code on ShopGoodwill search results and item pages.
+// @version      1.2.0
+// @description  Shows estimated shipping & handling and the total cost for your ZIP code on ShopGoodwill search results and item pages. Works on desktop and mobile.
 // @author       maxhayim
 // @license      MIT
 // @match        https://shopgoodwill.com/*
@@ -34,6 +34,9 @@
   if (typeof module === 'object' && module && module.exports) {
     module.exports = api;
   } else if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+    // Run once per page, even if the script is injected twice.
+    if (window.__sgwtShipping) return;
+    window.__sgwtShipping = true;
     api.start(window, document);
   }
 })(function () {
@@ -258,13 +261,15 @@
     '.P-box{border:1px solid #d6e0ee;background:#f5f8fc;border-radius:6px;padding:.6rem .75rem;margin:0 0 1rem}',
     '.P-box .P-line{font-size:1rem;margin:0}',
     '.P-box .P-detail{font-size:.8rem;color:#555;white-space:pre-line;margin-top:.25rem}',
-    '.P-panel{position:fixed;z-index:2147483000;right:16px;bottom:16px;background:#fff;border:1px solid #ccd;border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,.18);padding:12px 14px;font:14px/1.4 system-ui,sans-serif;color:#222;width:250px}',
+    '.P-panel{position:fixed;z-index:2147483000;right:16px;bottom:16px;background:#fff;border:1px solid #ccd;border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,.18);padding:12px 14px;font:14px/1.4 system-ui,sans-serif;color:#222;width:250px;max-width:calc(100vw - 32px);box-sizing:border-box;bottom:calc(16px + env(safe-area-inset-bottom, 0px))}',
     '.P-panel b{display:block;margin-bottom:6px}',
     '.P-panel input{width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #bbc;border-radius:4px;font-size:15px;margin:4px 0 8px}',
     '.P-panel .P-row{display:flex;gap:8px;justify-content:flex-end}',
     '.P-panel button{padding:5px 12px;border-radius:4px;border:1px solid #2a5d9f;background:#2a5d9f;color:#fff;cursor:pointer}',
     '.P-panel button.P-secondary{background:#fff;color:#2a5d9f}',
-    '.P-panel .P-msg{color:#b00020;font-size:12px;min-height:1em}'
+    '.P-panel .P-msg{color:#b00020;font-size:12px;min-height:1em}',
+    '@media (pointer: coarse){.P-panel input{font-size:16px;padding:8px}.P-panel button{min-height:40px;padding:0 16px}.P-line button{padding:6px 2px}}',
+    '@media (prefers-color-scheme: dark){.P-panel{background:#1f2329;color:#eceff3;border-color:#3a414b}.P-panel input{background:#2a2f37;color:#eceff3;border-color:#4a525d}.P-panel button.P-secondary{background:transparent;color:#8db8f0}.P-panel .P-msg{color:#ff8a80}}'
   ].join('\n');
 
   function start(win, doc, config) {

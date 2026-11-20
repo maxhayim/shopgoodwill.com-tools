@@ -19,11 +19,11 @@
 
 **shopgoodwill.com tools** is a set of small, independent browser userscripts that make ShopGoodwill.com easier to bid on: ending times in your time zone, what an item will really cost delivered, an auction page that keeps itself up to date, alerts when you're outbid, and one-click price checks before you bid.
 
-Each tool is a single file in [`scripts/`](scripts/). Install only the ones you want.
+Each tool is a single file in [`scripts/`](scripts/). Install only the ones you want. They work on desktop and on phones, including iPhone Safari (see [Installation](#installation)).
 
 | Tool | What it does | Install |
 |---|---|---|
-| **Eastern Time** | Shows auction ending times in Eastern Time (EST/EDT) | [Install](https://raw.githubusercontent.com/maxhayim/shopgoodwill.com-tools/main/scripts/shopgoodwill-eastern-time.user.js) |
+| **Local Time** | Shows auction ending times in your time zone, detected automatically, or any zone you pick | [Install](https://raw.githubusercontent.com/maxhayim/shopgoodwill.com-tools/main/scripts/shopgoodwill-local-time.user.js) |
 | **Shipping & Handling** | Estimated shipping & handling and the total cost for your ZIP code, on search results and item pages | [Install](https://raw.githubusercontent.com/maxhayim/shopgoodwill.com-tools/main/scripts/shopgoodwill-shipping.user.js) |
 | **Live Auction** | Keeps the price, bids and a to-the-second countdown up to date on item pages, and in the tab title | [Install](https://raw.githubusercontent.com/maxhayim/shopgoodwill.com-tools/main/scripts/shopgoodwill-live-auction.user.js) |
 | **Price Check** | One click to sold prices, current listings and search-by-photo on other marketplaces | [Install](https://raw.githubusercontent.com/maxhayim/shopgoodwill.com-tools/main/scripts/shopgoodwill-price-check.user.js) |
@@ -46,7 +46,7 @@ The tools don't depend on each other and work together on the same page.
 <table>
   <tr>
     <td width="50%"><img src="assets/screenshots/shipping-item.png" alt="Shipping breakdown box on an item page"><br><em>Shipping & Handling on an item page</em></td>
-    <td width="50%"><img src="assets/screenshots/live-auction.png" alt="Time left 5:08:14, ends Thu 11/19, 9:02 PM EST, and a Live chip beside Current Price"><br><em>Live Auction countdown with the Eastern end time beside it</em></td>
+    <td width="50%"><img src="assets/screenshots/live-auction.png" alt="Time left 5:08:14, ends Thu 11/19, 9:02 PM EST, and a Live chip beside Current Price"><br><em>Live Auction countdown with the local end time beside it</em></td>
   </tr>
   <tr>
     <td><img src="assets/screenshots/bid-alerts-panel.png" alt="Bid alerts panel listing an outbid item, one within the max and one ended, plus settings"><br><em>Bid Alerts overview and settings</em></td>
@@ -54,7 +54,7 @@ The tools don't depend on each other and work together on the same page.
   </tr>
   <tr>
     <td><img src="assets/screenshots/bid-alerts-toast.png" alt="Outbid pop-up: You've been outbid. Price is now $36.00 (your max $30.00)"><br><em>An outbid alert</em></td>
-    <td><img src="assets/screenshots/eastern-time.png" alt="Item info table showing Ends On 11/23/2026 10:56:00 PM EST"><br><em>Eastern Time on the item page's Ends On line</em></td>
+    <td><img src="assets/screenshots/eastern-time.png" alt="Item info table showing Ends On 11/23/2026 10:56:00 PM EST"><br><em>Local Time on the item page's Ends On line (Eastern shown)</em></td>
   </tr>
 </table>
 
@@ -62,18 +62,22 @@ The tools don't depend on each other and work together on the same page.
 
 ## Features
 
-### Eastern Time
+### Local Time
 
-- Converts auction ending times such as `6:39:00 PM PDT` to `9:39:00 PM EDT`.
-- Shows **EST** or **EDT** correctly, including on the nights the clocks change.
+*Formerly Eastern Time. Existing installs update to it automatically.*
+
+- Converts auction ending times from ShopGoodwill's Pacific Time to **your device's time zone**, detected automatically: `6:39:00 PM PDT` becomes `9:39:00 PM EDT` in New York, `8:39:00 PM CDT` in Chicago, `3:39:00 PM HST` in Honolulu.
+- Works with **every time zone** your browser knows (more than 400), in the US and abroad. To use a different one, tap or click the end time next to **Time left** on any item page and pick a zone. The choice is saved; pick **Automatic** to follow the device again.
+- Shows standard or daylight time correctly (EST/EDT, CST/CDT, MST, AKST/AKDT, HST...), including on the nights the clocks change.
 - Uses the auction's closing date when it is on the page, never today's date.
 - Handles times that cross midnight, for example `10:30:00 PM PST` → `1:30:00 AM EST (next day)`.
 - Keeps the original Pacific time in a tooltip: hover over a converted time to see it.
-- On item pages, shows the end time in Eastern Time right beside the countdown: **Time left: 5h 18m · ends Thu 11/19, 9:02 PM EST**.
-- Also converts the item page's **Ends On** line (`11/23/2026 07:56:00 PM PT` → `11/23/2026 10:56:00 PM EST`), using its date for EST/EDT.
+- On item pages, shows the end time in your time zone right beside the countdown: **Time left: 5h 18m · ends Thu 11/19, 9:02 PM EST**.
+- Also converts the item page's **Ends On** line (`11/23/2026 07:56:00 PM PT` → `11/23/2026 10:56:00 PM EST`), using its date for standard/daylight time.
 - Works on pages Angular loads or redraws after the page opens (search results, paging, item pages).
 - Converts each time once, and converts again only if the site puts a new Pacific time in its place.
 - Leaves countdown timers, prices, bid buttons and everything else alone.
+- Light on phone batteries: countdown ticks don't trigger rescans; only new Pacific times do.
 - Plain JavaScript: no jQuery, no frameworks, no network requests, no permissions (`@grant none`).
 
 ### Shipping & Handling
@@ -119,17 +123,22 @@ The tools don't depend on each other and work together on the same page.
 
 ## Requirements
 
-- A desktop browser with a userscript manager. [Tampermonkey](https://www.tampermonkey.net/) is the one this project targets.
+- A browser with a userscript manager. [Tampermonkey](https://www.tampermonkey.net/) is the one this project targets:
+  - **Desktop:** Chrome, Edge, Firefox or Safari.
+  - **iPhone and iPad:** Safari with the Tampermonkey Safari extension (iOS 15 or newer).
+  - **Android:** Firefox with the Tampermonkey add-on.
 
 ## Privacy
 
 - The tools run only on `shopgoodwill.com` and `www.shopgoodwill.com`.
 - Shipping & Handling, Live Auction and Bid Alerts talk only to ShopGoodwill's own API (`buyerapi.shopgoodwill.com`), the same one the site uses. Your ZIP code goes there and nowhere else.
 - Bid Alerts reads prices from the public item details everyone sees. It never uses your login, password or session.
-- Your ZIP code, cached estimates, followed auctions and alert settings are kept in your browser's storage for shopgoodwill.com, under keys starting with `sgwTools.`.
+- Your ZIP code, cached estimates, followed auctions, alert settings and chosen time zone are kept in your browser's storage for shopgoodwill.com, under keys starting with `sgwTools.`.
 - No accounts, analytics, tracking or third-party servers.
 
 ## Installation
+
+### Desktop
 
 1. Install the Tampermonkey extension for your browser:
    - [Chrome](https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo)
@@ -138,7 +147,7 @@ The tools don't depend on each other and work together on the same page.
    - [Safari](https://www.tampermonkey.net/?browser=safari)
 2. In Chrome and Edge, allow userscripts: open the extension's details page and turn on **Allow User Scripts** (or **Developer mode** on older versions).
 3. Open the install link for each tool you want:
-   - **[Eastern Time](https://raw.githubusercontent.com/maxhayim/shopgoodwill.com-tools/main/scripts/shopgoodwill-eastern-time.user.js)**
+   - **[Local Time](https://raw.githubusercontent.com/maxhayim/shopgoodwill.com-tools/main/scripts/shopgoodwill-local-time.user.js)**
    - **[Shipping & Handling](https://raw.githubusercontent.com/maxhayim/shopgoodwill.com-tools/main/scripts/shopgoodwill-shipping.user.js)**
    - **[Live Auction](https://raw.githubusercontent.com/maxhayim/shopgoodwill.com-tools/main/scripts/shopgoodwill-live-auction.user.js)**
    - **[Price Check](https://raw.githubusercontent.com/maxhayim/shopgoodwill.com-tools/main/scripts/shopgoodwill-price-check.user.js)**
@@ -148,15 +157,36 @@ The tools don't depend on each other and work together on the same page.
 6. For shipping estimates, click **set ZIP for estimate** under any search result and enter your ZIP code.
 7. For desktop notifications, open **Bid alerts** (bottom left), tick **Desktop notifications** and allow them when the browser asks.
 
+### iPhone and iPad (Safari)
+
+1. Install **Tampermonkey** for Safari from the App Store ([details](https://www.tampermonkey.net/?browser=safari)).
+2. Turn it on: **Settings → Apps → Safari → Extensions → Tampermonkey** (on iOS 17 and earlier, **Settings → Safari → Extensions**). Switch it on and allow it on **shopgoodwill.com** and **raw.githubusercontent.com** (where the install links point), or on **All Websites**.
+3. In Safari, open the install link for each tool you want (the same links as above, for example **[Local Time](https://raw.githubusercontent.com/maxhayim/shopgoodwill.com-tools/main/scripts/shopgoodwill-local-time.user.js)**). Tampermonkey shows its install page; tap **Install**. If you only see the script's text, tap the extensions button in the address bar (**aA** or the puzzle piece), choose **Tampermonkey**, and install from there.
+4. Open [shopgoodwill.com](https://shopgoodwill.com/) normally. There's no need to request the desktop site.
+
+On iPhone:
+- Times use the phone's time zone (**Settings → General → Date & Time**). Tap the end time on an item page to pick another.
+- Tap where you would hover on a computer: the end time opens the time zone picker, and the item page's shipping box shows the full breakdown.
+- Bid Alerts shows pop-ups and plays sounds while Safari has a ShopGoodwill tab open in front. iOS pauses background tabs, so alerts catch up when you return. Safari on iPhone has no desktop notifications for websites, so that setting is hidden there.
+
+The free [Userscripts](https://github.com/quoid/userscripts) Safari extension should also run these scripts (they need no special permissions), but it hasn't been tested.
+
+### Android (Firefox)
+
+1. Install [Firefox for Android](https://play.google.com/store/apps/details?id=org.mozilla.firefox), then add [Tampermonkey](https://addons.mozilla.org/android/addon/tampermonkey/) from Firefox's add-ons menu.
+2. Open the install links above in Firefox and tap **Install**.
+
 ## Usage
 
-- **Eastern Time:** nothing to set up. Ending times appear in Eastern Time. Hover over a time to see the original Pacific time.
+- **Local Time:** nothing to set up. Ending times appear in your device's time zone. Hover over a time to see the original Pacific time. To change the zone, click or tap the end time next to **Time left** on an item page.
 - **Shipping & Handling:** set your ZIP code once. Hover over an estimate for the breakdown.
 - **Live Auction:** open any item page. Click the **Live** chip to pause or resume updates.
 - **Price Check:** click **Price check**, adjust the search terms if needed, then click a marketplace. Press <kbd>Enter</kbd> to open the first link, <kbd>Esc</kbd> to close.
 - **Bid Alerts:** bid as usual; the item is followed automatically. To follow something else, click **Alert me** on its page. Keep at least one ShopGoodwill tab open to get alerts.
 
-### Eastern Time examples
+### Local Time examples
+
+In New York (Eastern):
 
 | ShopGoodwill shows | Closing date known? | You see |
 |---|---|---|
@@ -171,11 +201,15 @@ The tools don't depend on each other and work together on the same page.
 
 ## How It Works
 
-### Eastern Time
+### Local Time
 
-The script looks for elements matching `li.text-danger`, and for the value next to labels such as **Ends On:**, whose text contains a time ending in `PDT`, `PST` or `PT`. It replaces just that time in the element's text and remembers what it wrote, so the next scan skips it. A `MutationObserver` watches for Angular adding or redrawing content and triggers a rescan (debounced, so a burst of changes causes one scan).
+The zone comes from the browser (`Intl.DateTimeFormat().resolvedOptions().timeZone`) unless you picked one; your choice is kept in `localStorage` under `sgwTools.time.zone`.
+
+The script looks for elements matching `li.text-danger`, and for the value next to labels such as **Ends On:**, whose text contains a time ending in `PDT`, `PST` or `PT`. It replaces just that time in the element's text and remembers what it wrote, so the next scan skips it. It keeps the original Pacific text in a `data-sgw-et-source` attribute. A `MutationObserver` watches for Angular adding or redrawing content and triggers a rescan (debounced, so a burst of changes causes one scan). Text changes that hold no Pacific time, such as a ticking countdown, are ignored.
 
 #### Daylight saving time
+
+For zones that keep Eastern time (New York, Toronto, Detroit...), the script uses its own Eastern rules, described below. Every other zone is converted through the browser's time zone database (`Intl.DateTimeFormat`), which knows each zone's rules, including countries that change clocks on different dates. When the closing date isn't on the page, today's date (Pacific) is used, which only matters around a clock change; the tooltip says so.
 
 Pacific and Eastern Time are three hours apart almost all the time. The exception is the two nights a year the clocks change, because each zone changes at 2 AM *its own* local time:
 
@@ -210,7 +244,7 @@ Outbid detection compares the price with your max bid. With proxy bidding, the p
 
 ### Updating selectors
 
-ShopGoodwill can change its markup at any time. Everything page-specific is in the `CONFIG` block at the top of each script. For example, in [`scripts/shopgoodwill-eastern-time.user.js`](scripts/shopgoodwill-eastern-time.user.js):
+ShopGoodwill can change its markup at any time. Everything page-specific is in the `CONFIG` block at the top of each script. For example, in [`scripts/shopgoodwill-local-time.user.js`](scripts/shopgoodwill-local-time.user.js):
 
 ```javascript
 var CONFIG = {
@@ -235,16 +269,27 @@ If a tool stops working:
 
 Each script's `@updateURL` and `@downloadURL` point at its copy on the `main` branch. Tampermonkey checks it on its normal schedule (daily by default) and installs a new version when the `@version` number goes up. To check right away, open the Tampermonkey dashboard and choose **Check for userscript updates**.
 
+Eastern Time was renamed **Local Time** in v2.0.0. Its old address (`shopgoodwill-eastern-time.user.js`) still serves the same script, so existing installs update to Local Time and then follow the new address.
+
 ## Browser Compatibility
 
-The scripts use only standard JavaScript and browser features (`fetch`, `MutationObserver`, `IntersectionObserver`, `localStorage`) available in every current browser. It is written for Tampermonkey on desktop Chrome, Edge, Firefox and Safari. Other userscript managers (Violentmonkey, Greasemonkey 4, Userscripts for Safari) should work but have not been tested.
+The scripts use only standard JavaScript and browser features (`fetch`, `MutationObserver`, `IntersectionObserver`, `localStorage`, `Intl`) available in every current browser. They are written for Tampermonkey on desktop Chrome, Edge, Firefox and Safari, Safari on iPhone and iPad, and Firefox for Android. Other userscript managers (Violentmonkey, Greasemonkey 4, Userscripts for Safari) should work but have not been tested.
+
+ShopGoodwill's phone layout uses the same page structure as the desktop one, so every tool works in Safari's normal mobile view. On phones:
+- Text boxes use 16px text, so Safari doesn't zoom in when you tap them.
+- Buttons get bigger tap targets.
+- Floating panels stay clear of the iPhone home bar, fit narrow screens, and follow the light or dark appearance.
+- The Bid alerts button shrinks to a bell and a count.
+- The Price Check panel doesn't pop up the keyboard when it opens.
 
 ## Known Limitations
 
 - The automated tests use a small stand-in DOM, not a real browser. Eastern Time and Shipping & Handling have been used on the live site with Tampermonkey. The other tools were checked by loading them into live ShopGoodwill pages in Chrome (see [CHANGELOG.md](CHANGELOG.md)).
-- The closing date is only used when it appears in the time's own text or in the same listing. If ShopGoodwill does not show it near the time, the script falls back to adding three hours as described above.
-- Only US daylight-saving rules from 2007 onward are built in. If Congress changes them, the script will need an update.
-- Converts to Eastern Time only. Other time zones are on the roadmap.
+- Mobile support was checked in desktop Chrome with ShopGoodwill's phone layout at iPhone width (390px). It has not yet been tried on a real iPhone or Android phone, or in Firefox or desktop Safari.
+- The closing date is only used when it appears in the time's own text or in the same listing. If ShopGoodwill does not show it near the time, the script falls back as described above.
+- For Eastern zones, the US daylight-saving rules from 2007 onward are built in; if Congress changes them, the script will need an update. Other zones follow the browser's own time zone data, which updates with the browser.
+- Times change zone after a reload: picking a new zone reloads the page.
+- The time zone picker is on item pages only. The choice applies everywhere on ShopGoodwill.
 - Shipping estimates are for US ZIP codes only, and are estimates: ShopGoodwill sets the final cost at checkout. Combined shipping for several items won by the same buyer is not reflected.
 - Live Auction updates the item page only, not the countdowns on search results.
 - Price Check links depend on each marketplace's search address. If one changes, the link may open a general search page instead.
@@ -261,7 +306,9 @@ The scripts use only standard JavaScript and browser features (`fetch`, `Mutatio
 | Chrome/Edge: script never runs | Turn on **Allow User Scripts** (or **Developer mode**) for Tampermonkey, then reload. |
 | Some times convert, others don't | ShopGoodwill may show those times in a different element. See [Updating selectors](#updating-selectors) and open an issue with the element's HTML. |
 | A time shows `ET` instead of `EST`/`EDT` | The closing date wasn't found and the time is between 11 PM and 2 AM Pacific. Hover for details. The time itself is still three hours ahead of Pacific. |
-| Want the original time | Hover over the converted time. |
+| Want the original time | Hover over the converted time. On a phone, the item page's **Ends On** time and the picker show the zone in use. |
+| Times are in the wrong time zone | Tap or click the end time next to **Time left** on an item page and pick your zone, or **Automatic** to use the device's. On iPhone, check **Settings → General → Date & Time**. |
+| iPhone: nothing changes on ShopGoodwill | In **Settings → Apps → Safari → Extensions → Tampermonkey**, make sure it's on and allowed for shopgoodwill.com. Then reload the page. |
 | Shipping shows **S&H unavailable** | Hover for ShopGoodwill's reason. Check your ZIP code with **change ZIP**. Some items can't be shipped to every ZIP code. |
 | Shipping estimates look out of date | Estimates are kept for six hours. Changing the ZIP code fetches new ones. |
 | The tab title keeps showing ⏱ | That's Live Auction following the item. Click the **Live** chip to pause it, or leave the item page. |
@@ -281,7 +328,6 @@ Planned tools. Each will be its own script in `scripts/` that can be installed s
 - Auction search improvements
 - Optional cross-device synchronization
 - Auction history
-- Additional time zone options
 - Browser extension packaging
 
 ## Development

@@ -5,7 +5,7 @@ labels: bug
 ---
 
 **Tool and version**
-For example: Eastern Time 1.0.0 (the Tampermonkey dashboard shows the version).
+For example: Local Time 2.0.0 on iPhone Safari (the Tampermonkey dashboard shows the version).
 
 **Browser and userscript manager**
 For example: Chrome, Tampermonkey.

@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         shopgoodwill.com tools - Price Check
 // @namespace    https://github.com/maxhayim/shopgoodwill.com-tools
-// @version      1.1.0
-// @description  Adds a Price Check button to ShopGoodwill listings: sold prices, current listings and search-by-photo on other marketplaces in one click.
+// @version      1.2.0
+// @description  Adds a Price Check button to ShopGoodwill listings: sold prices, current listings and search-by-photo on other marketplaces in one click. Works on desktop and mobile.
 // @author       maxhayim
 // @license      MIT
 // @match        https://shopgoodwill.com/*
@@ -33,6 +33,9 @@
   if (typeof module === 'object' && module && module.exports) {
     module.exports = api;
   } else if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+    // Run once per page, even if the script is injected twice.
+    if (window.__sgwtPriceCheck) return;
+    window.__sgwtPriceCheck = true;
     api.start(window, document);
   }
 })(function () {
@@ -139,7 +142,9 @@
     '.P-photos button{all:unset;cursor:pointer;flex:0 0 auto;width:46px;height:46px;border-radius:6px;border:2px solid transparent;overflow:hidden;background:#eee}',
     '.P-photos button[aria-pressed="true"]{border-color:#6b3fa0}',
     '.P-photos img{width:100%;height:100%;object-fit:cover;display:block}',
-    '.P-note{color:#888;font-size:11px;margin-top:8px}'
+    '.P-note{color:#888;font-size:11px;margin-top:8px}',
+    '@media (pointer: coarse){.P-btn{padding:6px 10px;font-size:13px}.P-terms input{font-size:16px;padding:8px}.P-terms button{min-height:38px}.P-links a{padding:9px 12px;font-size:14px}.P-photos button{width:56px;height:56px}.P-close{padding:6px 8px;font-size:22px}}',
+    '@media (prefers-color-scheme: dark){.P-panel{background:#211d29;color:#ece8f2;border-color:#463b57}.P-head{color:#d6c2f2}.P-terms input{background:#2b2635;color:#ece8f2;border-color:#54476a}.P-terms button{color:#d6c2f2;border-color:#54476a}.P-group{color:#b3a2cc}.P-links a{background:#342b44;color:#e7dcf7}.P-note{color:#9a91a8}}'
   ].join('\n');
 
   function start(win, doc, config, sources) {
@@ -282,8 +287,12 @@
       var left = Math.min(r.left + win.scrollX, win.scrollX + doc.documentElement.clientWidth - panel.offsetWidth - 12);
       panel.style.left = Math.max(win.scrollX + 12, left) + 'px';
       panel.style.top = (r.bottom + win.scrollY + 6) + 'px';
-      input.focus();
-      input.select();
+      // On touch screens, focusing would pop up the keyboard over the links.
+      var coarse = win.matchMedia && win.matchMedia('(pointer: coarse)').matches;
+      if (!coarse) {
+        input.focus();
+        input.select();
+      }
     }
 
     function makeButton(itemId, getTitle, extraClass) {

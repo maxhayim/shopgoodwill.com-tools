@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         shopgoodwill.com tools - Bid Alerts
 // @namespace    https://github.com/maxhayim/shopgoodwill.com-tools
-// @version      1.2.0
-// @description  Alerts you on ShopGoodwill when you're outbid, when someone bids on an item you follow, and before your auctions end.
+// @version      1.3.0
+// @description  Alerts you on ShopGoodwill when you're outbid, when someone bids on an item you follow, and before your auctions end. Works on desktop and mobile.
 // @author       maxhayim
 // @license      MIT
 // @match        https://shopgoodwill.com/*
@@ -46,6 +46,9 @@
   if (typeof module === 'object' && module && module.exports) {
     module.exports = api;
   } else if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+    // Run once per page, even if the script is injected twice.
+    if (window.__sgwtBidAlerts) return;
+    window.__sgwtBidAlerts = true;
     api.start(window, document);
   }
 })(function () {
@@ -273,6 +276,10 @@
     '.P-settings label{display:flex;align-items:center;gap:6px}',
     '.P-settings input[type=text]{width:90px;padding:2px 5px;border:1px solid #bbc;border-radius:4px}',
     '.P-empty{color:#777;padding:6px 0}',
+    '.P-fab{bottom:calc(16px + env(safe-area-inset-bottom, 0px))}.P-panel{bottom:calc(62px + env(safe-area-inset-bottom, 0px))}.P-toasts{top:calc(16px + env(safe-area-inset-top, 0px))}',
+    '@media (max-width: 480px){.P-fab{padding:9px 11px}.P-fab-label{display:none}.P-toasts{left:12px;right:12px;width:auto;max-width:none}.P-panel{left:12px;right:12px;width:auto;max-width:none}}',
+    '@media (pointer: coarse){.P-follow-row input,.P-settings input[type=text]{font-size:16px}.P-follow{padding:8px 12px}.P-row .P-x,.P-toast button{padding:6px 8px;font-size:20px}.P-settings label{min-height:32px}}',
+    '@media (prefers-color-scheme: dark){.P-panel,.P-toast{background:#1f2329;color:#eceff3}.P-panel h4,.P-row a,.P-toast a{color:#9cc3f5}.P-row{border-color:#333a44}.P-row small,.P-empty{color:#a9b2bd}.P-settings{border-color:#3a414b}.P-settings input[type=text]{background:#2a2f37;color:#eceff3;border-color:#4a525d}}',
     '.P-note{color:#888;font-size:11px}'
   ].join('\n');
 
@@ -601,7 +608,8 @@
       var active = ids.filter(function (id) { return !all[id].ended; });
       var outbid = active.filter(function (id) { return statusOf(all[id]).kind === 'outbid'; }).length;
       fab.innerHTML = BELL;
-      fab.appendChild(doc.createTextNode('Bid alerts'));
+      fab.appendChild(el('span', 'fab-label', 'Bid alerts'));
+      fab.setAttribute('aria-label', 'Bid alerts');
       var count = el('b', null, outbid ? outbid + ' outbid' : String(active.length));
       fab.appendChild(count);
       fab.classList.toggle(P + '-has-outbid', outbid > 0);
@@ -666,7 +674,8 @@
           input.checked = perm === 'granted';
         });
       });
-      s.appendChild(desk);
+      // iPhone Safari (outside home-screen web apps) has no notifications.
+      if (typeof win.Notification === 'function') s.appendChild(desk);
       var endLabel = doc.createElement('label');
       endLabel.textContent = 'Warn before the end (minutes):';
       var endInput = doc.createElement('input');

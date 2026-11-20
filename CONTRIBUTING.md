@@ -17,7 +17,8 @@ Thanks for your interest in improving shopgoodwill.com tools.
 - **Never change bidding.** Tools may read and decorate the page, but must not place bids, click buttons or submit forms on the user's behalf.
 - **No tracking.** Tools must not send data anywhere unless that is the feature and the user turns it on. Talking to ShopGoodwill's own API is fine; keep requests few (cache, load lazily, limit how many run at once).
 - **Be original.** Ideas can come from anywhere, but write your own code, wording and design. Don't copy code from other extensions or scripts unless their license allows it, and say where it came from.
-- **Make scripts loadable by Node** so tests run the real code: export the functions when `module` exists, start on the page otherwise. See the Eastern Time script for the pattern.
+- **Make scripts loadable by Node** so tests run the real code: export the functions when `module` exists, start on the page otherwise. See the Local Time script for the pattern.
+- **Check phone widths** for anything you add to the page: no fixed widths wider than the screen, 16px text in inputs (iPhone Safari zooms in otherwise), and a click handler rather than hover for anything important.
 
 ## Before opening a pull request
 
