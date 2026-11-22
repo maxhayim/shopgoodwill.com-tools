@@ -35,8 +35,8 @@ The tools don't depend on each other and work together on the same page.
 <h2>Screenshots</h2>
 
 <p align="center">
-  <img src="assets/screenshots/overview.png" alt="An item page with all the tools: Price check button, Alert me, shipping estimate box and the Live chip" width="900">
-  <br><em>An item page with Price Check, Bid Alerts, Shipping & Handling and Live Auction</em>
+  <img src="assets/screenshots/overview.png" alt="An item page with all the tools: Price check button, Favorite & alert me, shipping estimate box, time left with the local end time, the Live chip and the top of the Deal check box" width="900">
+  <br><em>An item page with Price Check, Bid Alerts, Shipping & Handling, Live Auction, Local Time and Deal Check</em>
 </p>
 
 <p align="center">
@@ -50,7 +50,11 @@ The tools don't depend on each other and work together on the same page.
     <td width="50%"><img src="assets/screenshots/live-auction.png" alt="Time left 5:08:14, ends Thu 11/19, 9:02 PM EST, and a Live chip beside Current Price"><br><em>Live Auction countdown with the local end time beside it</em></td>
   </tr>
   <tr>
-    <td><img src="assets/screenshots/bid-alerts-panel.png" alt="Bid alerts panel listing an outbid item, one within the max and one ended, plus settings"><br><em>Bid Alerts overview and settings</em></td>
+    <td><img src="assets/screenshots/deal-check.png" alt="Deal check set to resell: sells for $300, next bid $127.00 plus S&H $15.33 is $142.33, Great flip, profit $116.47 (82% return) after $41.20 fees, bid up to $183.74"><br><em>Deal Check: is it worth the price?</em></td>
+    <td><img src="assets/screenshots/saved-searches.png" alt="Saved Searches: two from ShopGoodwill with bells, one with alerts off, and one added in the panel"><br><em>Saved Searches, synced with ShopGoodwill</em></td>
+  </tr>
+  <tr>
+    <td><img src="assets/screenshots/bid-alerts-panel.png" alt="Bid alerts panel with an outbid item, one within the max and one followed, saved searches and settings"><br><em>Bid Alerts overview</em></td>
     <td><img src="assets/screenshots/price-check.png" alt="Price check panel with sold prices, for sale now and search by photo"><br><em>Price Check</em></td>
   </tr>
   <tr>
@@ -59,7 +63,7 @@ The tools don't depend on each other and work together on the same page.
   </tr>
 </table>
 
-<sub>Screenshots from shopgoodwill.com, taken 2026-11-18 with a demo ZIP code. Listings and photos belong to their sellers.</sub>
+<sub>Screenshots from shopgoodwill.com, taken 2026-11-18 to 2026-11-22 with a demo ZIP code and example saved searches. Listings and photos belong to their sellers.</sub>
 
 ## Features
 
