@@ -204,3 +204,54 @@ test('new listings remembers a limited number of items', () => {
   assert.equal(out.search.seen.length, 400);
   assert.equal(out.search.seen[399], '500');
 });
+
+const site = (id, text, extra) => Object.assign({
+  savedSearchId: id, searchText: text, lowPrice: 0, highPrice: 999999, searchBuyNowOnly: '',
+  searchPickupOnly: false, searchNoPickupOnly: false, searchOneCentShippingOnly: false,
+  selectedCategoryIds: '', selectedGroup: '', selectedSellerIds: '', categoryName: null, sellerName: null
+}, extra || {});
+
+test('ShopGoodwill saved searches become saved searches here', () => {
+  const out = A.mergeSiteSearches([], [site(11, 'apple  computer'), site(12, 'datsun', { highPrice: 50, lowPrice: 5 })]);
+  assert.deepEqual(out.map((s) => [s.id, s.siteId, s.words, s.minPrice, s.maxPrice]),
+    [['sgw-11', '11', 'apple computer', null, null], ['sgw-12', '12', 'datsun', 5, 50]]);
+});
+
+test('syncing keeps history, drops deleted ones, lists repeats once', () => {
+  const local = [
+    { id: 'sgw-11', siteId: '11', words: 'gmrs', seen: ['1'], mark: 'm', lastCheck: 5, found: 2, off: true },
+    { id: 'sgw-99', siteId: '99', words: 'gone from the site' },
+    { id: 'abc', words: 'Ham Radio', seen: ['7'], found: 1 },
+    { id: 'mine', words: 'pyrex -lid', maxPrice: 20 }
+  ];
+  const out = A.mergeSiteSearches(local, [
+    site(11, 'gmrs'), site(20, 'ham radio'), site(30, 'walkie talkie'), site(31, 'walkie talkie'), site(32, '   ')
+  ]);
+  assert.deepEqual(out.map((s) => s.id), ['sgw-11', 'sgw-20', 'sgw-30', 'mine']);
+  assert.deepEqual([out[0].seen, out[0].mark, out[0].found, out[0].off], [['1'], 'm', 2, true]);
+  // The one added here with the same words hands over its history.
+  assert.deepEqual([out[1].seen, out[1].found], [['7'], 1]);
+  // Not signed in or bad data: our own list is unchanged.
+  assert.deepEqual(A.mergeSiteSearches(local, null).map((s) => s.id), ['abc', 'mine']);
+});
+
+test('saved search filters carry into the search and results link', () => {
+  const [s] = A.mergeSiteSearches([], [site(40, 'lens', {
+    lowPrice: 10, highPrice: 80, selectedCategoryIds: '12,13', selectedSellerIds: '5', searchPickupOnly: false,
+    searchNoPickupOnly: true, searchBuyNowOnly: 'true', categoryName: 'Cameras'
+  })]);
+  const body = A.searchBody(s, 40);
+  assert.equal(body.lowPrice, '10');
+  assert.equal(body.highPrice, '80');
+  assert.equal(body.selectedCategoryIds, '12,13');
+  assert.equal(body.selectedSellerIds, '5');
+  assert.equal(body.searchNoPickupOnly, 'true');
+  assert.equal(body.searchBuyNowOnly, 'true');
+  assert.equal(body.sortDescending, 'true');
+  const url = A.searchPageUrl(s);
+  assert.match(url, /[?]st=lens&/);
+  assert.match(url, /&c=12%2C13&s=5&lp=10&hp=80&sbn=true&/);
+  assert.match(url, /&snpo=true&/);
+  // Searches added here still search everything.
+  assert.equal(A.searchBody({ words: 'pyrex' }).lowPrice, '0');
+});

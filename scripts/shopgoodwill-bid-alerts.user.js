@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         shopgoodwill.com tools - Bid Alerts
 // @namespace    https://github.com/maxhayim/shopgoodwill.com-tools
-// @version      1.4.0
-// @description  Alerts you on ShopGoodwill when you're outbid, when someone bids on an item you follow, before your auctions end, and when new listings match your search words. Favoriting an item turns its alerts on. Works on desktop and mobile.
+// @version      1.5.0
+// @description  Alerts you on ShopGoodwill when you're outbid, when someone bids on an item you follow, before your auctions end, and when new listings match your saved searches (synced with your ShopGoodwill saved searches). Favoriting an item turns its alerts on. Works on desktop and mobile.
 // @author       maxhayim
 // @license      MIT
 // @match        https://shopgoodwill.com/*
@@ -25,7 +25,7 @@
  *   - New bid: someone bid on an item you follow
  *   - Ending soon: 15, 5 and 1 minute(s) before the end (configurable)
  *   - Ended: the final price, and whether it was within your max
- *   - New listing: a new item matches words you saved (e.g. "casio g-shock")
+ *   - New listing: a new item matches one of your saved searches
  *
  * What it follows:
  *   - Every bid you place in this browser. The script notices the site's own
@@ -37,13 +37,17 @@
  *     alerts (alerts for your own bids stay on). "Alert me" also favorites
  *     the item when you're signed in, so your favorites and alerts match.
  *
- * New listing alerts run your saved words through ShopGoodwill's own search,
- * newest first, and tell you about listings that weren't there last time.
+ * Saved Searches run through ShopGoodwill's own search, newest first, and
+ * tell you about listings that weren't there last time. They include the
+ * saved searches on your ShopGoodwill account (My ShopGoodwill > Saved
+ * Searches), kept in sync whenever you're signed in, plus any you add here.
  *
  * Alerts appear as pop-ups on every open ShopGoodwill tab, with an optional
  * sound and optional desktop notifications. One tab does the checking (the
  * others listen), so alerts aren't repeated. Prices come from the same
- * public item details the site shows to everyone; your login is never used.
+ * public item details the site shows to everyone. Your login is used for one
+ * thing only: reading your own saved searches list, from inside the page,
+ * the same way the site does. It is never stored or sent anywhere else.
  *
  * The same file runs in Tampermonkey and in Node.js (for the tests).
  */
@@ -84,6 +88,9 @@
     searchPageSize: 40,
     maxSeenPerSearch: 400,
     maxToastsPerSearch: 3,
+    savedSearchesPath: /\/SaveSearches\/GetSaveSearches(?:\?|$)/i,
+    savedSearchesPage: '/shopgoodwill/saved-searches',
+    siteSyncEveryMs: 30 * 60 * 1000,
     toastMs: 12000,
     storagePrefix: 'sgwTools.alerts.',
     cssPrefix: 'sgwt-alert'
@@ -95,7 +102,8 @@
     desktop: false,
     newBidAlerts: true,
     favoriteAlerts: true,   // favoriting an item follows it
-    searchEveryMin: 10      // how often saved words are searched
+    searchEveryMin: 10,     // how often saved searches are checked
+    syncSiteSearches: true  // include your ShopGoodwill saved searches
   };
 
   // ---------------------------------------------------------------------------
@@ -273,31 +281,47 @@
     return { query: include.join(' '), exclude: exclude };
   }
 
+  // Filters a search can carry over from a ShopGoodwill saved search.
+  function filtersOf(search) {
+    var f = search.filters || {};
+    var yes = function (v) { return v === true || v === 'true' ? 'true' : 'false'; };
+    return {
+      group: String(f.group || ''), categoryIds: String(f.categoryIds || ''), sellerIds: String(f.sellerIds || ''),
+      buyNowOnly: String(f.buyNowOnly || ''), pickupOnly: yes(f.pickupOnly), noPickupOnly: yes(f.noPickupOnly),
+      oneCentShippingOnly: yes(f.oneCentShippingOnly),
+      minPrice: typeof search.minPrice === 'number' && search.minPrice > 0 ? search.minPrice : 0,
+      maxPrice: typeof search.maxPrice === 'number' && search.maxPrice > 0 ? search.maxPrice : 999999
+    };
+  }
+
   function searchBody(search, pageSize) {
     var w = parseWords(search.words);
-    var max = typeof search.maxPrice === 'number' && search.maxPrice > 0 ? String(search.maxPrice) : '999999';
+    var f = filtersOf(search);
     return {
-      searchText: w.query, selectedGroup: '', selectedCategoryIds: '', selectedSellerIds: '',
-      lowPrice: '0', highPrice: max, searchBuyNowOnly: '', searchPickupOnly: 'false',
-      searchNoPickupOnly: 'false', searchOneCentShippingOnly: 'false', searchDescriptions: 'false',
+      searchText: w.query, selectedGroup: f.group, selectedCategoryIds: f.categoryIds, selectedSellerIds: f.sellerIds,
+      lowPrice: String(f.minPrice), highPrice: String(f.maxPrice), searchBuyNowOnly: f.buyNowOnly, searchPickupOnly: f.pickupOnly,
+      searchNoPickupOnly: f.noPickupOnly, searchOneCentShippingOnly: f.oneCentShippingOnly, searchDescriptions: 'false',
       searchClosedAuctions: 'false', closedAuctionEndingDate: '1/1/0001', closedAuctionDaysBack: '7',
       searchCanadaShipping: 'false', searchInternationalShippingOnly: 'false',
       sortColumn: '1', sortDescending: 'true',   // newly listed first
       page: '1', pageSize: String(pageSize || 40), savedSearchId: 0, useBuyerPrefs: 'false',
       searchUSOnlyShipping: 'false', categoryLevelNo: '1', categoryLevel: 1, categoryId: 0,
-      partNumber: '', catIds: ''
+      partNumber: '', catIds: f.categoryIds
     };
   }
 
   // The site's own results page for a saved search, newest first.
   function searchPageUrl(search) {
     var w = parseWords(search.words);
-    var max = typeof search.maxPrice === 'number' && search.maxPrice > 0 ? search.maxPrice : 999999;
+    var f = filtersOf(search);
+    var e = encodeURIComponent;
     // The results page only loads with its full set of parameters.
-    return '/categories/listing?st=' + encodeURIComponent(w.query) +
-      '&sg=&c=&s=&lp=0&hp=' + max + '&sbn=&spo=false&snpo=false&socs=false&sd=false&sca=false' +
+    return '/categories/listing?st=' + e(w.query) +
+      '&sg=' + e(f.group) + '&c=' + e(f.categoryIds) + '&s=' + e(f.sellerIds) +
+      '&lp=' + f.minPrice + '&hp=' + f.maxPrice + '&sbn=' + e(f.buyNowOnly) +
+      '&spo=' + f.pickupOnly + '&snpo=' + f.noPickupOnly + '&socs=' + f.oneCentShippingOnly + '&sd=false&sca=false' +
       '&caed=&cadb=7&scs=false&sis=false&col=1&p=1&ps=40&desc=true&ss=0&UseBuyerPrefs=true' +
-      '&sus=false&cln=1&catIds=&pn=&wc=false&mci=false&hmt=true&layout=grid';
+      '&sus=false&cln=1&catIds=' + e(f.categoryIds) + '&pn=&wc=false&mci=false&hmt=true&layout=grid';
   }
 
   /**
@@ -338,6 +362,59 @@
     s.seen = (s.seen || []).slice(-config.maxSeenPerSearch);
     if (newest) s.mark = newest;
     return { fresh: fresh, search: s };
+  }
+
+  /**
+   * Turns ShopGoodwill's saved searches list into our saved searches.
+   * local: our current list. site: `data` from SaveSearches/GetSaveSearches.
+   * - each site search becomes {id: 'sgw-<savedSearchId>', siteId, words, ...}
+   * - what we already know about it (seen listings, alerts on/off) is kept
+   * - one we added here with the same words takes over that history
+   * - site searches deleted on ShopGoodwill are dropped; our own stay
+   * - repeats on the site (same words and filters) are listed once
+   */
+  function mergeSiteSearches(local, site) {
+    local = Array.isArray(local) ? local : [];
+    var byId = {}, byWords = {};
+    local.forEach(function (s) {
+      if (!s) return;
+      if (s.siteId) byId[s.siteId] = s;
+      else byWords[String(s.words || '').toLowerCase()] = s;
+    });
+    var out = [], keys = {}, taken = {};
+    (Array.isArray(site) ? site : []).forEach(function (d) {
+      if (!d || !d.savedSearchId) return;
+      var words = String(d.searchText || '').replace(/\s+/g, ' ').trim();
+      if (!parseWords(words).query) return;
+      var hp = Number(d.highPrice), lp = Number(d.lowPrice);
+      var filters = {
+        group: String(d.selectedGroup || ''), categoryIds: String(d.selectedCategoryIds || ''),
+        sellerIds: String(d.selectedSellerIds || ''), buyNowOnly: String(d.searchBuyNowOnly || ''),
+        pickupOnly: !!d.searchPickupOnly, noPickupOnly: !!d.searchNoPickupOnly,
+        oneCentShippingOnly: !!d.searchOneCentShippingOnly
+      };
+      var s = {
+        id: 'sgw-' + d.savedSearchId, siteId: String(d.savedSearchId), words: words,
+        minPrice: lp > 0 ? lp : null, maxPrice: hp > 0 && hp < 999999 ? hp : null,
+        filters: filters, category: d.categoryName || null, seller: d.sellerName || null
+      };
+      var key = [words.toLowerCase(), s.minPrice, s.maxPrice, JSON.stringify(filters)].join('|');
+      if (keys[key]) return;
+      keys[key] = true;
+      var old = byId[s.siteId];
+      if (!old && byWords[words.toLowerCase()] && !taken[words.toLowerCase()]) {
+        old = byWords[words.toLowerCase()];
+        taken[words.toLowerCase()] = true;
+      }
+      if (old) ['seen', 'mark', 'lastCheck', 'found', 'error', 'off', 'created'].forEach(function (k) {
+        if (old[k] !== undefined) s[k] = old[k];
+      });
+      out.push(s);
+    });
+    local.forEach(function (s) {
+      if (s && !s.siteId && !taken[String(s.words || '').toLowerCase()]) out.push(s);
+    });
+    return out;
   }
 
   // Picks which tab does the checking. `lock` is {id, t} or null.
@@ -387,7 +464,9 @@
     '@media (prefers-color-scheme: dark){.P-panel,.P-toast{background:#1f2329;color:#eceff3}.P-panel h4,.P-row a,.P-toast a{color:#9cc3f5}.P-row{border-color:#333a44}.P-row small,.P-empty{color:#a9b2bd}.P-settings{border-color:#3a414b}.P-settings input[type=text]{background:#2a2f37;color:#eceff3;border-color:#4a525d}}',
     '.P-note{color:#888;font-size:11px}',
     '.P-searches{border-top:1px solid #dde3ea;margin-top:8px;padding-top:8px}',
-    '.P-searches h5{margin:0 0 4px;font:700 13px system-ui,sans-serif;color:#1f3a5f}',
+    '.P-searches h5{margin:0 0 4px;font:700 13px system-ui,sans-serif;color:#1f3a5f;display:flex;justify-content:space-between;align-items:baseline}',
+    '.P-searches h5 a{font:400 12px system-ui,sans-serif;color:inherit;text-decoration:underline}',
+    '.P-row.P-off a{opacity:.55}',
     '.P-add{display:flex;gap:6px;margin:6px 0 4px}',
     '.P-add input{min-width:0;padding:4px 6px;border:1px solid #bbc;border-radius:4px;font:13px system-ui,sans-serif}',
     '.P-add input:first-child{flex:1}.P-add input:nth-child(2){width:64px}',
@@ -474,12 +553,26 @@
         var open = XHR.prototype.open;
         var send = XHR.prototype.send;
         XHR.prototype.__sgwtAlerts = true;
+        var setHeader = XHR.prototype.setRequestHeader;
+        XHR.prototype.setRequestHeader = function (name, value) {
+          try {
+            if (/^authorization$/i.test(name) && /^Bearer\s+\S+/.test(String(value)) &&
+                String(this.__sgwtUrl || '').indexOf(config.apiBase) === 0) siteAuth = String(value);
+          } catch (e) { /* never interfere */ }
+          return setHeader.apply(this, arguments);
+        };
         XHR.prototype.open = function (method, url) {
           try { this.__sgwtUrl = String(url); this.__sgwtMethod = String(method).toUpperCase(); } catch (e) { /* ignore */ }
           return open.apply(this, arguments);
         };
         XHR.prototype.send = function (body) {
           try {
+            if (config.savedSearchesPath.test(this.__sgwtUrl || '')) {
+              var sx = this;
+              sx.addEventListener('load', function () {
+                try { if (sx.status >= 200 && sx.status < 300 && !sx.__sgwtOwn) gotSiteSearches(sx.responseText); } catch (e) { /* never interfere */ }
+              });
+            }
             if (this.__sgwtMethod === 'POST' && config.placeBidPath.test(this.__sgwtUrl || '')) {
               var xhr = this;
               xhr.addEventListener('load', function () {
@@ -514,6 +607,37 @@
         win.fetch = wrapped;
       }
     })();
+
+    // --- ShopGoodwill saved searches sync ------------------------------------
+    // siteAuth is the sign-in header the site itself just used. It lives only
+    // in this page's memory and is only sent back to ShopGoodwill's own API.
+    var siteAuth = null;
+    function gotSiteSearches(text) {
+      var j = typeof text === 'string' ? JSON.parse(text) : text;
+      if (!j || j.status === false || !Array.isArray(j.data)) return;
+      write('siteSync', Date.now());
+      if (!prefs().syncSiteSearches) return;
+      var before = JSON.stringify(searches());
+      var next = mergeSiteSearches(searches(), j.data);
+      if (JSON.stringify(next) !== before) { saveSearches(next); loop(); }
+    }
+    function syncSiteSearches(force) {
+      if (!siteAuth || !prefs().syncSiteSearches || !signedIn()) return;
+      if (!force && Date.now() - (read('siteSync', 0) || 0) < config.siteSyncEveryMs) return;
+      write('siteSync', Date.now());   // other tabs: this one is on it
+      try {
+        var x = new win.XMLHttpRequest();
+        x.__sgwtOwn = true;
+        x.open('POST', config.apiBase + 'SaveSearches/GetSaveSearches');
+        x.setRequestHeader('Content-Type', 'application/json');
+        x.setRequestHeader('Authorization', siteAuth);
+        x.addEventListener('load', function () {
+          if (x.status >= 200 && x.status < 300) { try { gotSiteSearches(x.responseText); } catch (e) { /* ignore */ } }
+          else if (x.status === 401) siteAuth = null;
+        });
+        x.send(null);
+      } catch (e) { /* ignore */ }
+    }
 
     function titleFor(itemId) {
       var r = items()[itemId];
@@ -676,8 +800,9 @@
 
     function loopSearches(now) {
       var every = Math.max(2, Number(prefs().searchEveryMin) || DEFAULT_PREFS.searchEveryMin) * 60000;
+      var on = prefs().syncSiteSearches;
       searches().forEach(function (s, i) {
-        if (searchInFlight[s.id]) return;
+        if (searchInFlight[s.id] || s.off || (s.siteId && !on)) return;
         // Spread searches out a little so they don't all go at once.
         var due = (s.lastCheck || 0) + every + i * 5000;
         if (!s.lastCheck || now >= due) checkSearch(s);
@@ -687,6 +812,7 @@
     function loop() {
       if (!isLeader()) return;
       loopSearches(Date.now());
+      syncSiteSearches(false);
       var all = items();
       var now = Date.now();
       var changed = false;
@@ -852,8 +978,8 @@
       var count = el('b', null, outbid ? outbid + ' outbid' : String(active.length));
       fab.appendChild(count);
       fab.classList.toggle(P + '-has-outbid', outbid > 0);
-      var ns = searches().length;
-      fab.title = active.length + ' auction(s) followed' + (ns ? ', ' + ns + ' new listing alert(s)' : '');
+      var ns = searches().filter(function (x) { return !x.off; }).length;
+      fab.title = active.length + ' auction(s) followed' + (ns ? ', ' + ns + ' saved search(es)' : '');
     }
 
     function closePanel() { if (panelEl) { panelEl.remove(); panelEl = null; } }
@@ -909,6 +1035,11 @@
       renderSearches(p);
 
       var s = el('div', 'settings');
+      s.appendChild(checkbox('Include my ShopGoodwill saved searches', p.syncSiteSearches, function (v) {
+        setPref('syncSiteSearches', v);
+        if (v) syncSiteSearches(true);
+        renderFab(); renderPanel();
+      }));
       s.appendChild(checkbox('Favorites get alerts', p.favoriteAlerts, function (v) { setPref('favoriteAlerts', v); renderFollow(); }));
       s.appendChild(checkbox('Sound', p.sound, function (v) { setPref('sound', v); if (v) primeAudio(); }));
       s.appendChild(checkbox('Alerts for new bids', p.newBidAlerts, function (v) { setPref('newBidAlerts', v); }));
@@ -935,7 +1066,7 @@
       endLabel.appendChild(endInput);
       s.appendChild(endLabel);
       var everyLabel = doc.createElement('label');
-      everyLabel.textContent = 'Check for new listings every (minutes):';
+      everyLabel.textContent = 'Check saved searches every (minutes):';
       var everyInput = doc.createElement('input');
       everyInput.type = 'text';
       everyInput.setAttribute('inputmode', 'numeric');
@@ -957,25 +1088,50 @@
       }
     }
 
-    // New listing alerts: saved words, checked against the newest listings.
+    // Saved Searches: yours from ShopGoodwill plus any added here, checked
+    // against the newest listings.
     function renderSearches(p) {
       var box = el('div', 'searches');
-      box.appendChild(el('h5', null, 'New listing alerts'));
-      var list = searches();
-      if (!list.length) box.appendChild(el('div', 'empty', 'Get an alert when a new listing matches your words. Put - before words to skip, e.g. casio g-shock -parts.'));
+      var head = el('h5', null, 'Saved Searches');
+      var manage = doc.createElement('a');
+      manage.href = config.savedSearchesPage;
+      manage.textContent = 'On ShopGoodwill';
+      manage.title = 'Your saved searches on ShopGoodwill';
+      head.appendChild(manage);
+      box.appendChild(head);
+      var list = searches().filter(function (sr) { return !sr.siteId || p.syncSiteSearches; });
+      if (!list.length) {
+        box.appendChild(el('div', 'empty', p.syncSiteSearches && signedIn() && !read('siteSync', 0)
+          ? 'Getting your ShopGoodwill saved searches…'
+          : 'Get an alert when a new listing matches. Save a search on ShopGoodwill or add words here; put - before words to skip, e.g. casio g-shock -parts.'));
+      }
       list.forEach(function (sr) {
-        var row = el('div', 'row');
+        var row = el('div', 'row' + (sr.off ? ' off' : ''));
         var a = doc.createElement('a');
         a.href = searchPageUrl(sr);
         a.textContent = sr.words;
-        var x = el('button', 'x', '×');
+        var x = el('button', 'x', sr.siteId ? (sr.off ? '🔕' : '🔔') : '×');
         x.type = 'button';
-        x.title = 'Delete this alert';
-        x.addEventListener('click', function () { updateSearch(sr.id, function () { return null; }); });
+        if (sr.siteId) {
+          // Deleting belongs on ShopGoodwill; here its alerts go on and off.
+          x.title = sr.off ? 'Turn alerts on' : 'Turn alerts off';
+          x.setAttribute('aria-label', x.title);
+          x.addEventListener('click', function () { updateSearch(sr.id, function (cur) { cur.off = !cur.off; return cur; }); });
+        } else {
+          x.title = 'Delete this saved search';
+          x.setAttribute('aria-label', x.title);
+          x.addEventListener('click', function () { updateSearch(sr.id, function () { return null; }); });
+        }
         var info = doc.createElement('small');
         var bits = [];
-        if (sr.maxPrice) bits.push('up to ' + formatMoney(sr.maxPrice));
-        bits.push(!sr.lastCheck ? 'checking…' : sr.error ? 'last check failed, retrying' : 'checked ' + ago(Date.now() - sr.lastCheck));
+        if (sr.siteId) bits.push('ShopGoodwill');
+        if (sr.category) bits.push(sr.category);
+        if (sr.seller) bits.push(sr.seller);
+        if (sr.minPrice && sr.maxPrice) bits.push(formatMoney(sr.minPrice) + '–' + formatMoney(sr.maxPrice));
+        else if (sr.maxPrice) bits.push('up to ' + formatMoney(sr.maxPrice));
+        else if (sr.minPrice) bits.push('from ' + formatMoney(sr.minPrice));
+        if (sr.off) bits.push('alerts off');
+        else bits.push(!sr.lastCheck ? 'checking…' : sr.error ? 'last check failed, retrying' : 'checked ' + ago(Date.now() - sr.lastCheck));
         if (sr.found) bits.push(sr.found + ' new found');
         info.textContent = bits.join(' · ');
         row.appendChild(a);
@@ -987,7 +1143,7 @@
       var words = doc.createElement('input');
       words.type = 'text';
       words.placeholder = 'Words, e.g. pyrex -lid';
-      words.setAttribute('aria-label', 'Words to look for in new listings');
+      words.setAttribute('aria-label', 'Words for a new saved search');
       var q = /[?&]st=([^&]*)/.exec(win.location.search || '');
       if (q) { try { words.value = decodeURIComponent(q[1].replace(/\+/g, ' ')); } catch (e) { /* ignore */ } }
       var max = doc.createElement('input');
@@ -1002,7 +1158,7 @@
         if (!parseWords(w).query) { words.focus(); return; }
         var m = parseFloat(String(max.value).replace(/[$,]/g, ''));
         var all = searches();
-        if (all.some(function (x) { return x.words.toLowerCase() === w.toLowerCase(); })) return;
+        if (all.some(function (x) { return x.words.toLowerCase() === w.toLowerCase() && !x.minPrice && !x.filters; })) return;
         all.push({ id: Math.random().toString(36).slice(2, 10), words: w, maxPrice: m > 0 ? m : null, created: Date.now() });
         words.value = '';
         max.value = '';
@@ -1018,7 +1174,7 @@
       add.appendChild(max);
       add.appendChild(btn);
       box.appendChild(add);
-      box.appendChild(el('div', 'note', 'The first check just notes what is listed now; after that, each new match is an alert.'));
+      box.appendChild(el('div', 'note', 'Searches added here stay in this browser. The first check of a search just notes what is listed now; after that, each new match is an alert.'));
       panelEl.appendChild(box);
     }
 
@@ -1081,6 +1237,8 @@
     searchBody: searchBody,
     searchPageUrl: searchPageUrl,
     newListings: newListings,
+    mergeSiteSearches: mergeSiteSearches,
+    filtersOf: filtersOf,
     start: start
   };
 });

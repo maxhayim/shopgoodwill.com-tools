@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented here. This project uses [Semantic Versioning](https://semver.org/).
 
+## v2.2.0 — Saved Searches synced with ShopGoodwill
+
+Release date: November 22, 2026
+
+- **Bid Alerts 1.5.0:**
+  - **New listing alerts are now Saved Searches**, synced with your ShopGoodwill saved searches (**My ShopGoodwill → Saved Searches**). While you're signed in they're included automatically, with their price range, category, seller and other filters, and the list follows what you save or delete on ShopGoodwill (checked whenever the site loads the list, and every 30 minutes).
+  - A bell beside each ShopGoodwill saved search turns its alerts off and on; searches you add in the panel stay in this browser as before.
+  - Repeated saved searches are listed once, and a search you'd added before with the same words keeps its history (no repeat alerts).
+  - New setting: **Include my ShopGoodwill saved searches** (on by default).
+  - Saved searches are only read; Bid Alerts never creates, changes or deletes them.
+- Tested: 93 automated tests; on live ShopGoodwill in Chrome, all 16 distinct saved searches on a real account synced and were checked, the 30-minute re-sync restored a search, the bell switched alerts off, and the panel fits a 390px phone width.
+- Not yet checked: real phones.
+
 ## v2.1.0 — Deal Check, favorites with alerts, new listing alerts
 
 Release date: November 19, 2026

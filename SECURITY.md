@@ -29,8 +29,8 @@ Tampermonkey installs updates automatically, so only the latest release receives
 
 - Scripts run with `@grant none`: no special userscript permissions.
 - Scripts only contact ShopGoodwill itself (`buyerapi.shopgoodwill.com`, the site's own API). Price Check builds links to other marketplaces but never fetches from them.
-- The only data stored is your shipping ZIP code, cached estimates, followed auctions, saved search words, alert settings, Deal Check values and settings, and chosen time zone, in your browser's storage for shopgoodwill.com.
-- Scripts never read or use your login, password, session cookies or tokens. Bid Alerts reads only the site's reply to a bid (accepted or not, item and amount) and passes the request and reply through unchanged.
+- The only data stored is your shipping ZIP code, cached estimates, followed auctions, saved searches, alert settings, Deal Check values and settings, and chosen time zone, in your browser's storage for shopgoodwill.com.
+- Scripts never see your password and never store or send your sign-in anywhere. One exception is narrow: to read your ShopGoodwill saved searches list, Bid Alerts reuses the sign-in header the page itself just sent, only for that read-only request to ShopGoodwill's own API, and keeps it in the page's memory only. Bid Alerts also reads the site's reply to a bid (accepted or not, item and amount) and to the saved searches list, and passes requests and replies through unchanged.
 - Scripts never place bids or submit forms. The one site control a script presses is ShopGoodwill's favorite heart, and only when you click **Favorite & alert me** in Bid Alerts.
 - Scripts never insert HTML built from page or API data; text from ShopGoodwill is always set as plain text.
 - No third-party code or dependencies are bundled.
